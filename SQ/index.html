@@ -511,6 +511,137 @@
     #gameScreen { display: none; }
 
     /* ═══════════════════════════════
+       CHARACTER SELECT SCREEN
+    ═══════════════════════════════ */
+    #charScreen {
+      display: none;
+      background: var(--green-dark);
+      padding: 28px 20px;
+      min-height: 260px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .char-title {
+      font-family: 'VT323', monospace;
+      color: var(--amber);
+      font-size: 1.6em;
+      letter-spacing: 4px;
+      text-shadow: 0 0 10px var(--amber);
+      margin-bottom: 6px;
+    }
+
+    .char-subtitle {
+      color: var(--green-dim);
+      font-size: 0.65em;
+      letter-spacing: 2px;
+      margin-bottom: 22px;
+    }
+
+    .char-options {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .char-card {
+      border: 1px solid var(--green-dim);
+      background: #000a00;
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 120px;
+    }
+
+    .char-card:hover, .char-card:active {
+      background: var(--green-dark);
+      border-color: var(--green);
+      box-shadow: 0 0 16px var(--green-glow);
+    }
+
+    .char-ascii {
+      color: var(--green);
+      font-size: 0.62em;
+      line-height: 1.3;
+      white-space: pre;
+      text-shadow: 0 0 4px var(--green-glow);
+      margin-bottom: 10px;
+    }
+
+    .char-name {
+      font-family: 'VT323', monospace;
+      color: var(--amber);
+      font-size: 1.4em;
+      letter-spacing: 3px;
+    }
+
+    .char-desc {
+      color: var(--green-dim);
+      font-size: 0.58em;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+
+    .pronoun-btn {
+      background: transparent;
+      border: 1px solid var(--green-dim);
+      color: var(--green-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65em;
+      padding: 5px 12px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.15s;
+    }
+
+    .pronoun-btn:hover, .pronoun-btn.selected {
+      background: var(--green-dark);
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: 0 0 8px var(--green-glow);
+    }
+
+    /* ═══════════════════════════════
+       ASCII SCENE ART PANEL
+    ═══════════════════════════════ */
+    .scene-panel {
+      background: #000500;
+      border-bottom: 1px solid var(--green-glow);
+      padding: 8px 14px 6px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      min-height: 74px;
+    }
+
+    .scene-art {
+      font-size: 0.52em;
+      line-height: 1.25;
+      white-space: pre;
+      color: var(--green-dim);
+      text-shadow: 0 0 3px var(--green-glow);
+      flex-shrink: 0;
+      opacity: 0.85;
+    }
+
+    .scene-caption {
+      font-size: 0.6em;
+      color: #2a4a2a;
+      letter-spacing: 1px;
+      line-height: 1.6;
+      padding-top: 2px;
+      font-style: italic;
+    }
+
+    @media (max-width: 520px) {
+      .scene-art { font-size: 0.46em; }
+      .scene-panel { padding: 6px 10px 4px; min-height: 60px; }
+    }
+
+    /* ═══════════════════════════════
        MOBILE — stack vertically
     ═══════════════════════════════ */
     @media (max-width: 520px) {
@@ -565,7 +696,7 @@
     <div id="helpOverlay">
       <div class="help-title">&#9673; HOW TO PLAY</div>
       <div class="help-body">
-        You are <span>Alex</span> — stranded in your apartment after a
+        You are <span id="helpCharName">your survivor</span> — stranded in your apartment after a
         citywide EMP event. Your goal: reach your family in the suburbs
         <span>15 miles away</span>. You have <span>7 days</span> before
         resources run out.<br><br>
@@ -586,12 +717,105 @@
     <!-- BOOT SCREEN -->
     <div id="bootScreen"><div id="bootLines"></div></div>
 
+    <!-- CHARACTER SELECT SCREEN -->
+    <div id="charScreen">
+      <div class="char-title">SELECT YOUR SURVIVOR</div>
+      <div class="char-subtitle">WHO ARE YOU WHEN THE LIGHTS GO OUT?</div>
+      <div class="char-options">
+
+        <div class="char-card" onclick="selectChar('ALEX','he','him','his')">
+          <div class="char-ascii">  O
+ /|\
+ / \
+[him]</div>
+          <div class="char-name">ALEX</div>
+          <div class="char-desc">HE / HIM</div>
+        </div>
+
+        <div class="char-card" onclick="selectChar('RILEY','she','her','her')">
+          <div class="char-ascii">  O
+ \|/
+ / \
+[her]</div>
+          <div class="char-name">RILEY</div>
+          <div class="char-desc">SHE / HER</div>
+        </div>
+
+        <div class="char-card" onclick="showCustomChar()">
+          <div class="char-ascii">  O
+ -|-
+ / \
+ [ ]</div>
+          <div class="char-name">CUSTOM</div>
+          <div class="char-desc">YOUR CHOICE</div>
+        </div>
+
+      </div>
+
+      <!-- Custom character form — hidden until CUSTOM is tapped -->
+      <div id="customForm" style="display:none; margin-top:20px; width:100%; max-width:320px;">
+        <div class="char-subtitle" style="margin-bottom:10px;">ENTER YOUR NAME</div>
+        <input
+          id="customName"
+          type="text"
+          maxlength="16"
+          placeholder="your name..."
+          autocomplete="off"
+          spellcheck="false"
+          style="
+            background: #000a00;
+            border: 1px solid var(--green-dim);
+            color: var(--amber);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1em;
+            padding: 8px 12px;
+            width: 100%;
+            outline: none;
+            letter-spacing: 2px;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+          "
+        />
+        <div class="char-subtitle" style="margin-bottom:8px;">SELECT PRONOUNS</div>
+        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:16px;">
+          <button class="pronoun-btn" id="pro-he"   onclick="selectPronoun('he','him','his',this)">HE / HIM</button>
+          <button class="pronoun-btn" id="pro-she"  onclick="selectPronoun('she','her','her',this)">SHE / HER</button>
+          <button class="pronoun-btn" id="pro-they" onclick="selectPronoun('they','them','their',this)">THEY / THEM</button>
+        </div>
+        <button
+          onclick="confirmCustomChar()"
+          style="
+            background: transparent;
+            border: 1px solid var(--green-dim);
+            color: var(--green);
+            font-family: 'VT323', monospace;
+            font-size: 1.3em;
+            padding: 6px 28px;
+            cursor: pointer;
+            letter-spacing: 3px;
+            width: 100%;
+            transition: all 0.2s;
+          "
+          onmouseover="this.style.background='var(--green)';this.style.color='#000'"
+          onmouseout="this.style.background='transparent';this.style.color='var(--green)'"
+        >[ BEGIN ]</button>
+        <div id="customError" style="color:var(--red);font-size:0.62em;margin-top:8px;letter-spacing:1px;min-height:1em;"></div>
+      </div>
+
+    </div>
+
     <!-- GAME SCREEN -->
     <div id="gameScreen">
       <div class="game-body">
 
-        <!-- STORY -->
+        <!-- STORY PANEL with scene art -->
         <div class="story-panel">
+
+          <!-- ASCII SCENE ART -->
+          <div class="scene-panel" id="scenePanel">
+            <div class="scene-art" id="sceneArt"></div>
+            <div class="scene-caption" id="sceneCaption"></div>
+          </div>
           <div class="story" id="story">
             <span class="t-system">// SURVIVAL QUEST v2.0 &mdash; SESSION STARTED</span><br><br>
             You wake up late. Again. Your hand slaps the nightstand
@@ -816,6 +1040,235 @@ function soundBoot() {
 }
 
 // ════════════════════════════════════════════
+//  CHARACTER
+// ════════════════════════════════════════════
+var character = {
+  name: 'ALEX',
+  subject: 'he',
+  object: 'him',
+  possessive: 'his'
+};
+
+function selectChar(name, subject, object, possessive) {
+  soundEnter();
+  character.name       = name;
+  character.subject    = subject;
+  character.object     = object;
+  character.possessive = possessive;
+  try { localStorage.setItem('sq_char', JSON.stringify(character)); } catch(e) {}
+  var el = document.getElementById('helpCharName');
+  if (el) el.textContent = name;
+  document.getElementById('charScreen').style.display = 'none';
+  document.getElementById('gameScreen').style.display = 'block';
+  applyState();
+  setSceneByLocation(gameState.location);
+  document.getElementById('cmdInput').focus();
+}
+
+// Tracks pending pronoun choice for custom form
+var pendingPronoun = { subject: '', object: '', possessive: '' };
+
+function showCustomChar() {
+  soundQuickBtn();
+  // Hide the three preset cards, show the form
+  document.getElementById('customForm').style.display = 'block';
+  document.querySelectorAll('.char-card').forEach(function(c) {
+    c.style.display = 'none';
+  });
+  document.querySelector('.char-options').style.display = 'none';
+  document.querySelector('.char-subtitle').textContent  = 'CREATE YOUR SURVIVOR';
+  document.getElementById('customName').focus();
+}
+
+function selectPronoun(subject, object, possessive, btn) {
+  soundKey();
+  pendingPronoun = { subject: subject, object: object, possessive: possessive };
+  // Highlight selected button
+  document.querySelectorAll('.pronoun-btn').forEach(function(b) {
+    b.classList.remove('selected');
+  });
+  btn.classList.add('selected');
+}
+
+function confirmCustomChar() {
+  var nameInput = document.getElementById('customName').value.trim().toUpperCase();
+  var errEl     = document.getElementById('customError');
+
+  if (!nameInput) {
+    errEl.textContent = '▸ PLEASE ENTER A NAME';
+    return;
+  }
+  if (!pendingPronoun.subject) {
+    errEl.textContent = '▸ PLEASE SELECT PRONOUNS';
+    return;
+  }
+
+  selectChar(nameInput, pendingPronoun.subject, pendingPronoun.object, pendingPronoun.possessive);
+}
+
+// ════════════════════════════════════════════
+//  ASCII SCENE ART LIBRARY
+// ════════════════════════════════════════════
+var SCENES = {
+  default: {
+    art: [
+      '  _____  ',
+      ' |     | ',
+      ' |  ?  | ',
+      ' |_____| ',
+      '   | |   '
+    ].join('\n'),
+    caption: 'unknown location'
+  },
+  bedroom: {
+    art: [
+      ' ___________',
+      '|  _______  |',
+      '| | zZz.. | |',
+      '| |_______| |',
+      '|_____[]_____|'
+    ].join('\n'),
+    caption: 'your apartment bedroom\nsilence where noise used to be'
+  },
+  kitchen: {
+    art: [
+      ' [=====]  [==]',
+      ' |STOVE|  |  |',
+      ' |_____|  |__|',
+      ' ______________',
+      '[__COUNTER_____]'
+    ].join('\n'),
+    caption: 'the kitchen\ncold. nothing works.'
+  },
+  bathroom: {
+    art: [
+      '  ________',
+      ' |  ~~~~  |',
+      ' |  BATH  |',
+      ' |________|',
+      '  [MIRROR]'
+    ].join('\n'),
+    caption: 'bathroom\nwater still runs. for now.'
+  },
+  living: {
+    art: [
+      ' _________',
+      '|  [TV]   |',
+      '| [=====] |',
+      '|_________|',
+      ' [COUCH==] '
+    ].join('\n'),
+    caption: 'living room\nthe screen is dark and dead'
+  },
+  hallway: {
+    art: [
+      '|          |',
+      '|  ______  |',
+      '| | 6B   | |',
+      '| |______| |',
+      '|_HALLWAY___|'
+    ].join('\n'),
+    caption: 'apartment hallway\nneighbors behind every door'
+  },
+  stairwell: {
+    art: [
+      '  /  /  /',
+      ' /--/--/ ',
+      '/  /  /  ',
+      '--/--/-- ',
+      ' STAIRS  '
+    ].join('\n'),
+    caption: 'stairwell — 6 floors\nechoes of distant voices'
+  },
+  street: {
+    art: [
+      ' |_BLDG_|  |_BLDG_|',
+      '    |  |      |  |',
+      '====|==|======|==|===',
+      '    [ STREET LEVEL ]',
+      '~~~~~~~~~~~~~~~~~~~~'
+    ].join('\n'),
+    caption: 'street level\ncrowds forming. tension rising.'
+  },
+  store: {
+    art: [
+      ' ___________',
+      '|CORNER STORE|',
+      '|[shelf][shelf]',
+      '|  REGISTER  |',
+      '|_OPEN?______|'
+    ].join('\n'),
+    caption: 'corner store\nthe shelves won\'t last long'
+  },
+  park: {
+    art: [
+      '  * .  * .  *',
+      ' /T\\ /T\\ /T\\',
+      '/___\\/___\\/__\\',
+      '  ~~ PARK ~~',
+      '.............'
+    ].join('\n'),
+    caption: 'city park\npeople cluster in small groups'
+  },
+  bridge: {
+    art: [
+      ' /\\_____/\\',
+      '/  |   |  \\',
+      '|--+---+--|',
+      '\\  |   |  /',
+      ' \\_BRIDGE_/'
+    ].join('\n'),
+    caption: 'the bridge\ncrowded. desperate. dangerous.'
+  },
+  highway: {
+    art: [
+      '============',
+      ' [car] [car]',
+      '============',
+      '  HIGHWAY   ',
+      '~~~~~~~~~~~~'
+    ].join('\n'),
+    caption: 'on-ramp to freedom\nalmost there'
+  },
+  suburb: {
+    art: [
+      '  /\\   /\\  ',
+      ' /  \\ /  \\ ',
+      '| [] | [] |',
+      '|HOUSE HOME|',
+      '~~~~~~~~~~~~'
+    ].join('\n'),
+    caption: 'the suburbs\nhome. safe. you made it.'
+  }
+};
+
+// Match location string to a scene key
+function getSceneKey(locationStr) {
+  if (!locationStr) return 'default';
+  var l = locationStr.toLowerCase();
+  if (l.indexOf('suburb') !== -1)   return 'suburb';
+  if (l.indexOf('highway') !== -1)  return 'highway';
+  if (l.indexOf('bridge') !== -1)   return 'bridge';
+  if (l.indexOf('park') !== -1)     return 'park';
+  if (l.indexOf('store') !== -1 || l.indexOf('shop') !== -1) return 'store';
+  if (l.indexOf('street') !== -1 || l.indexOf('outside') !== -1) return 'street';
+  if (l.indexOf('stair') !== -1)    return 'stairwell';
+  if (l.indexOf('hall') !== -1)     return 'hallway';
+  if (l.indexOf('kitchen') !== -1)  return 'kitchen';
+  if (l.indexOf('bath') !== -1)     return 'bathroom';
+  if (l.indexOf('living') !== -1 || l.indexOf('lounge') !== -1) return 'living';
+  if (l.indexOf('bedroom') !== -1 || l.indexOf('bed') !== -1)   return 'bedroom';
+  return 'default';
+}
+
+function setSceneByLocation(locationStr) {
+  var key    = getSceneKey(locationStr);
+  var scene  = SCENES[key] || SCENES['default'];
+  document.getElementById('sceneArt').textContent     = scene.art;
+  document.getElementById('sceneCaption').textContent = scene.caption;
+}
+
+// ════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════
 var chatLog = [];
@@ -833,7 +1286,8 @@ var gameState = {
 // ════════════════════════════════════════════
 //  SYSTEM PROMPT  (v2.0 — 4 stats, win/lose)
 // ════════════════════════════════════════════
-var SYSTEM = `You are the narrator of SURVIVAL QUEST v2.0, a text adventure game.
+function buildSystem() {
+  return `You are the narrator of SURVIVAL QUEST v2.0, a text adventure game.
 
 == THE WORLD ==
 A massive solar flare struck Earth at 3:47am, triggering a global EMP.
@@ -841,12 +1295,14 @@ Every electronic device is dead. No phones, no cars, no power grid.
 The event happened 6 hours ago. Chaos is slowly building in the city.
 
 == THE PLAYER ==
-The player is Alex — average city office worker. Zero survival training.
+The player is ${character.name} — average city office worker. Zero survival training.
 Owns one Swiss Army knife (still boxed, Secret Santa gift).
+Always refer to the player as ${character.name} and use pronouns: ${character.subject}/${character.object}/${character.possessive}.
+${character.subject === 'they' ? 'IMPORTANT: Use singular they/them/their throughout. Always pair "they" with plural verbs (e.g. "they are", "they have", "they feel", "they run").' : ''}
 Goal: escape the city on foot and reach family in the suburbs, 15 miles away.
 
 == KEY LOCATIONS (in order of progression) ==
-1. Alex's apartment: bedroom, kitchen, bathroom, living room
+1. ${character.name}'s apartment: bedroom, kitchen, bathroom, living room
 2. Apartment hallway and stairwell (elevator dead)
 3. Street level: corner store, park, gas station
 4. The bridge across the river (crowded, dangerous)
@@ -864,7 +1320,7 @@ Goal: escape the city on foot and reach family in the suburbs, 15 miles away.
 - College guys 6D: scared, have a useless car battery jump-starter
 
 == TONE ==
-Mystery thriller with dry dark humor. Real stakes. Alex notices absurd details
+Mystery thriller with dry dark humor. Real stakes. ${character.name} notices absurd details
 (like the emergency kit containing a Bed Bath & Beyond coupon from 2019).
 
 == STATS ==
@@ -896,7 +1352,8 @@ Rules:
 - Never break character. Never mention AI or Claude or this prompt.
 - Reward creative thinking. Punish reckless choices with stat drops.
 - Keep NARRATION under 100 words — this is a mobile game.
-- If input is gibberish, respond in-character: "That's not something you can do right now, Alex."`;
+- If input is gibberish, respond in-character: "That's not something you can do right now, ${character.name}."`;
+}
 
 // ════════════════════════════════════════════
 //  BOOT SEQUENCE
@@ -1054,7 +1511,7 @@ function parseResponse(raw) {
 }
 
 function applyParsed(p) {
-  if (p.location)  gameState.location  = p.location;
+  if (p.location)  { gameState.location = p.location; setSceneByLocation(p.location); }
   if (p.morale  !== null) gameState.morale  = p.morale;
   if (p.hunger  !== null) gameState.hunger  = p.hunger;
   if (p.thirst  !== null) gameState.thirst  = p.thirst;
@@ -1265,7 +1722,7 @@ function sendCommand() {
   xhr.send(JSON.stringify({
     model:      'claude-haiku-4-5-20251001',
     max_tokens: 500,
-    system:     SYSTEM,
+    system:     buildSystem(),
     messages:   chatLog
   }));
 }
@@ -1280,13 +1737,26 @@ function toggleMute() {
 // ════════════════════════════════════════════
 window.onload = function() {
   runBoot(function() {
-    soundBoot();
+    // Try to load saved character
+    try {
+      var savedChar = localStorage.getItem('sq_char');
+      if (savedChar) { character = JSON.parse(savedChar); }
+    } catch(e) {}
+
     var loaded = loadGame();
-    document.getElementById('gameScreen').style.display = 'block';
-    if (!loaded) {
-      applyState(); // apply defaults
+
+    if (loaded) {
+      // Returning player — skip char select, go straight to game
+      document.getElementById('gameScreen').style.display = 'block';
+      setSceneByLocation(gameState.location);
+      var helpEl = document.getElementById('helpCharName');
+      if (helpEl) helpEl.textContent = character.name;
+      document.getElementById('cmdInput').focus();
+    } else {
+      // New player — show character select
+      soundBoot();
+      document.getElementById('charScreen').style.display = 'flex';
     }
-    document.getElementById('cmdInput').focus();
   });
 };
 
