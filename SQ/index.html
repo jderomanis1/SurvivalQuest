@@ -692,6 +692,7 @@
       <div class="screen-footer">
         <div class="footer-txt" id="footerSector">&#9608; CITY SECTOR 7 &nbsp;|&nbsp; EMP EVENT DAY 1</div>
         <div class="footer-save" onclick="clearSave()" title="Reset game">&#9673; RESET</div>
+        <div class="footer-save" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#9834; SFX ON</div>
       </div>
     </div>
 
@@ -722,6 +723,98 @@
 </div><!-- /monitor -->
 
 <script>
+// ════════════════════════════════════════════
+//  AUDIO ENGINE  (Web Audio API — no files needed)
+// ════════════════════════════════════════════
+
+// The AudioContext is the browser's sound engine.
+// We create it lazily (on first user interaction) because
+// browsers block audio until the user has tapped/clicked something.
+var audioCtx = null;
+var audioEnabled = true;
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e) { audioEnabled = false; }
+  }
+  return audioCtx;
+}
+
+// Core beep builder:
+// type    = 'sine' | 'square' | 'sawtooth' | 'triangle'
+// freq    = pitch in Hz (440 = middle A)
+// duration = seconds
+// volume  = 0.0 to 1.0
+function beep(type, freq, duration, volume, startDelay) {
+  if (!audioEnabled) return;
+  try {
+    var ctx = getAudioCtx();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = freq instanceof Array ? 'square' : type;
+    var start = ctx.currentTime + (startDelay || 0);
+    // Frequency — supports single number or array for sweeps
+    if (freq instanceof Array) {
+      osc.frequency.setValueAtTime(freq[0], start);
+      osc.frequency.linearRampToValueAtTime(freq[1], start + duration);
+    } else {
+      osc.frequency.setValueAtTime(freq, start);
+    }
+    // Envelope: fast attack, quick decay to avoid clicks
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(volume, start + 0.01);
+    gain.gain.linearRampToValueAtTime(0, start + duration);
+    osc.start(start);
+    osc.stop(start + duration + 0.05);
+  } catch(e) {}
+}
+
+// ── Named sound effects ──────────────────────
+
+// Soft typewriter clack on each keypress
+function soundKey() {
+  beep('square', 280, 0.04, 0.06);
+}
+
+// Satisfying terminal ENTER beep
+function soundEnter() {
+  beep('square', 520, 0.05, 0.15);
+  beep('square', 660, 0.08, 0.12, 0.05);
+}
+
+// Quick action button tap
+function soundQuickBtn() {
+  beep('square', 440, 0.06, 0.1);
+}
+
+// Claude response received — ascending two-tone chime
+function soundResponse() {
+  beep('sine', 330, 0.1, 0.08);
+  beep('sine', 495, 0.15, 0.1, 0.1);
+}
+
+// Death — descending ominous drone
+function soundDeath() {
+  beep('sawtooth', [220, 80], 1.2, 0.18);
+  beep('sine', 110, 1.5, 0.12, 0.1);
+}
+
+// Victory — rising triumphant chime sequence
+function soundVictory() {
+  var notes = [262, 330, 392, 523, 659];
+  notes.forEach(function(n, i) {
+    beep('square', n, 0.18, 0.12, i * 0.15);
+  });
+}
+
+// Boot beep
+function soundBoot() {
+  beep('square', [80, 440], 0.3, 0.1);
+}
+
 // ════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════
@@ -1003,6 +1096,7 @@ function checkGameOver(parsed) {
 }
 
 function showDeath(cause, days) {
+  soundDeath();
   document.getElementById('gameScreen').style.display   = 'none';
   document.getElementById('deathCause').textContent     = 'cause of death: ' + cause;
   document.getElementById('deathDays').textContent      = days || gameState.day;
@@ -1012,6 +1106,7 @@ function showDeath(cause, days) {
 }
 
 function showVictory() {
+  soundVictory();
   document.getElementById('gameScreen').style.display     = 'none';
   document.getElementById('victoryDays').textContent      = gameState.day;
   document.getElementById('victoryMorale').textContent    = gameState.morale;
@@ -1056,6 +1151,7 @@ function removeCursor() {
 //  QUICK COMMAND BUTTONS
 // ════════════════════════════════════════════
 function quickCmd(cmd) {
+  soundQuickBtn();
   var input = document.getElementById('cmdInput');
   input.value = cmd;
   sendCommand();
@@ -1075,6 +1171,7 @@ function sendCommand() {
   var val = input.value.trim();
   if (!val || goBtn.disabled) return;
 
+  soundEnter();
   input.value = '';
   input.disabled = true;
   goBtn.disabled = true;
@@ -1134,6 +1231,7 @@ function sendCommand() {
         var parsed = parseResponse(raw);
         applyParsed(parsed);
         if (el) el.remove();
+        soundResponse();
         if (!checkGameOver(parsed)) {
           addLine(parsed.narration + '<br><span class="cursor"></span>', 't-narrator');
         }
@@ -1172,11 +1270,17 @@ function sendCommand() {
   }));
 }
 
+function toggleMute() {
+  audioEnabled = !audioEnabled;
+  document.getElementById('muteBtn').textContent = audioEnabled ? '♪ SFX ON' : '♪ SFX OFF';
+}
+
 // ════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════
 window.onload = function() {
   runBoot(function() {
+    soundBoot();
     var loaded = loadGame();
     document.getElementById('gameScreen').style.display = 'block';
     if (!loaded) {
@@ -1188,7 +1292,8 @@ window.onload = function() {
 
 document.getElementById('goBtn').addEventListener('click', sendCommand);
 document.getElementById('cmdInput').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') sendCommand();
+  if (e.key === 'Enter') { sendCommand(); }
+  else if (e.key.length === 1) { soundKey(); }
 });
 </script>
 </body>
