@@ -644,8 +644,50 @@
     }
 
     /* ═══════════════════════════════
-       ASCII SCENE ART PANEL
+       DAY MILESTONE BANNER
     ═══════════════════════════════ */
+    #dayBanner {
+      display: none;
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 40;
+      text-align: center;
+      padding: 14px 20px;
+      background: rgba(0,0,0,0.92);
+      border-top: 1px solid var(--amber);
+      border-bottom: 1px solid var(--amber);
+      box-shadow: 0 0 30px rgba(255,176,0,0.2);
+      animation: bannerIn 0.4s ease forwards;
+    }
+
+    .banner-day {
+      font-family: 'VT323', monospace;
+      color: var(--amber);
+      font-size: 2em;
+      letter-spacing: 6px;
+      text-shadow: 0 0 16px var(--amber);
+      display: block;
+    }
+
+    .banner-msg {
+      color: var(--green);
+      font-size: 0.72em;
+      letter-spacing: 2px;
+      margin-top: 4px;
+      display: block;
+    }
+
+    @keyframes bannerIn {
+      from { opacity: 0; transform: translateY(-50%) scaleY(0.6); }
+      to   { opacity: 1; transform: translateY(-50%) scaleY(1); }
+    }
+
+    @keyframes bannerOut {
+      from { opacity: 1; transform: translateY(-50%) scaleY(1); }
+      to   { opacity: 0; transform: translateY(-50%) scaleY(0.6); }
+    }
     .scene-panel {
       background: #000800;
       border-bottom: 1px solid var(--green-dim);
@@ -752,6 +794,12 @@
         Use the quick buttons below the story for common actions.
       </div>
       <button class="help-close" onclick="closeHelp()">[ CLOSE ]</button>
+    </div>
+
+    <!-- DAY MILESTONE BANNER -->
+    <div id="dayBanner">
+      <span class="banner-day" id="bannerDay">DAY 2</span>
+      <span class="banner-msg" id="bannerMsg">The city is waking up to reality.</span>
     </div>
 
     <!-- BOOT SCREEN -->
@@ -1566,6 +1614,59 @@ function renderInventoryGrid(inv) {
 }
 
 // ════════════════════════════════════════════
+//  DAY MILESTONE MESSAGES
+// ════════════════════════════════════════════
+var DAY_MESSAGES = {
+  2: 'The city is waking up to reality.',
+  3: 'Hunger and fear are becoming the same thing.',
+  4: 'People are starting to turn on each other.',
+  5: 'Hope is a luxury you can\'t afford.',
+  6: 'One more day. You have to make it.',
+  7: 'This is the last chance. Move. Now.'
+};
+
+var lastShownDay = 1; // track so we only show each day once
+
+function showDayBanner(day) {
+  var msg = DAY_MESSAGES[day];
+  if (!msg || day <= lastShownDay) return;
+  lastShownDay = day;
+
+  var banner  = document.getElementById('dayBanner');
+  var bannerDay = document.getElementById('bannerDay');
+  var bannerMsg = document.getElementById('bannerMsg');
+
+  bannerDay.textContent = 'DAY ' + day;
+  bannerMsg.textContent = msg;
+
+  // Show banner
+  banner.style.animation = 'bannerIn 0.4s ease forwards';
+  banner.style.display   = 'block';
+
+  // Also add a line to the story for permanence
+  setTimeout(function() {
+    addLine('<br><span style="color:var(--amber);letter-spacing:3px;">▓▓ DAY ' + day + ' — ' + msg + ' ▓▓</span><br>', '');
+  }, 600);
+
+  // Fade out after 3.5 seconds
+  setTimeout(function() {
+    banner.style.animation = 'bannerOut 0.4s ease forwards';
+    setTimeout(function() {
+      banner.style.display = 'none';
+    }, 400);
+  }, 3500);
+
+  // Play a sound sting
+  soundDayChange();
+}
+
+// New sound — dramatic day-change tone
+function soundDayChange() {
+  beep('square', [440, 220], 0.3, 0.15);
+  beep('sine',   220,        0.6, 0.1, 0.25);
+}
+
+// ════════════════════════════════════════════
 //  PARSE CLAUDE RESPONSE
 // ════════════════════════════════════════════
 function parseResponse(raw) {
@@ -1605,8 +1706,15 @@ function applyParsed(p) {
   if (p.hunger  !== null) gameState.hunger  = p.hunger;
   if (p.thirst  !== null) gameState.thirst  = p.thirst;
   if (p.energy  !== null) gameState.energy  = p.energy;
-  if (p.time)    gameState.time    = p.time;
-  if (p.day)     gameState.day     = p.day;
+  if (p.time)    gameState.time = p.time;
+
+  // Check for day change BEFORE updating state
+  if (p.day && p.day > (gameState.day || 1)) {
+    gameState.day = p.day;
+    showDayBanner(p.day);
+  } else if (p.day) {
+    gameState.day = p.day;
+  }
 
   if (p.inventory !== null) {
     if (p.inventory.toUpperCase() === 'NONE' || p.inventory === '') {
