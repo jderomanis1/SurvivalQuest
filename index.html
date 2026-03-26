@@ -983,12 +983,7 @@
 
       <!-- QUICK ACTIONS -->
       <div class="quick-actions" id="quickActions">
-        <button class="quick-btn" onclick="quickCmd('look around')">LOOK</button>
-        <button class="quick-btn" onclick="quickCmd('check my inventory')">INVENTORY</button>
-        <button class="quick-btn" onclick="quickCmd('check my status and stats')">STATUS</button>
-        <button class="quick-btn" onclick="quickCmd('go north')">GO NORTH</button>
-        <button class="quick-btn" onclick="quickCmd('go south')">GO SOUTH</button>
-        <button class="quick-btn" onclick="openHelp()">? HELP</button>
+        <!-- buttons injected dynamically by updateHintButtons() -->
       </div>
 
       <!-- INPUT -->
@@ -1150,6 +1145,7 @@ function selectChar(name, subject, object, possessive) {
   document.getElementById('gameScreen').style.display = 'block';
   applyState();
   setSceneByLocation(gameState.location);
+  updateHintButtons(gameState.location);
   document.getElementById('cmdInput').focus();
 }
 
@@ -1614,6 +1610,140 @@ function renderInventoryGrid(inv) {
 }
 
 // ════════════════════════════════════════════
+//  DYNAMIC HINT BUTTONS
+// ════════════════════════════════════════════
+
+// Each location key maps to an array of {label, cmd} objects.
+// ALWAYS ends with INVENTORY and HELP — those are universal.
+var LOCATION_HINTS = {
+  default: [
+    { label: 'LOOK',       cmd: 'look around' },
+    { label: 'STATUS',     cmd: 'check my status and stats' },
+    { label: 'INVENTORY',  cmd: 'check my inventory' },
+    { label: '? HELP',     cmd: null, action: 'help' }
+  ],
+  bedroom: [
+    { label: 'LOOK',           cmd: 'look around the bedroom' },
+    { label: 'CHECK PHONE',    cmd: 'check my phone' },
+    { label: 'LOOK OUTSIDE',   cmd: 'look out the window' },
+    { label: 'KITCHEN →',      cmd: 'go to the kitchen' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  kitchen: [
+    { label: 'LOOK',           cmd: 'look around the kitchen' },
+    { label: 'SEARCH DRAWERS', cmd: 'search the kitchen drawers' },
+    { label: 'TAKE WATER',     cmd: 'take the water bottles' },
+    { label: 'TAKE KNIFE',     cmd: 'take the swiss army knife' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  bathroom: [
+    { label: 'LOOK',           cmd: 'look around the bathroom' },
+    { label: 'FILL CONTAINER', cmd: 'fill a container with water' },
+    { label: 'CHECK MIRROR',   cmd: 'look in the mirror' },
+    { label: 'BEDROOM →',      cmd: 'go to the bedroom' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  living: [
+    { label: 'LOOK',           cmd: 'look around the living room' },
+    { label: 'SEARCH ROOM',    cmd: 'search the living room' },
+    { label: 'LOOK OUTSIDE',   cmd: 'look out the window' },
+    { label: 'HALLWAY →',      cmd: 'go to the hallway' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  hallway: [
+    { label: 'LOOK',           cmd: 'look around the hallway' },
+    { label: 'KNOCK ON 6B',    cmd: 'knock on Mrs Chen door 6B' },
+    { label: 'CHECK 6D',       cmd: 'check on the college guys in 6D' },
+    { label: 'STAIRWELL ↓',    cmd: 'go to the stairwell' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  stairwell: [
+    { label: 'LOOK',           cmd: 'look around the stairwell' },
+    { label: 'GO DOWN',        cmd: 'go down the stairs' },
+    { label: 'GO UP',          cmd: 'go up the stairs' },
+    { label: 'LISTEN',         cmd: 'listen carefully' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  street: [
+    { label: 'LOOK',           cmd: 'look around the street' },
+    { label: 'TALK TO CROWD',  cmd: 'talk to the people nearby' },
+    { label: 'CORNER STORE →', cmd: 'go to the corner store' },
+    { label: 'BRIDGE →',       cmd: 'head toward the bridge' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  store: [
+    { label: 'LOOK',           cmd: 'look around the store' },
+    { label: 'SEARCH SHELVES', cmd: 'search the shelves for supplies' },
+    { label: 'TALK TO OWNER',  cmd: 'talk to the store owner' },
+    { label: 'STREET →',       cmd: 'go back to the street' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  park: [
+    { label: 'LOOK',           cmd: 'look around the park' },
+    { label: 'FIND WATER',     cmd: 'look for a water source' },
+    { label: 'TALK TO PEOPLE', cmd: 'approach the group of people' },
+    { label: 'BRIDGE →',       cmd: 'head toward the bridge' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  bridge: [
+    { label: 'LOOK',           cmd: 'look around the bridge' },
+    { label: 'PUSH THROUGH',   cmd: 'push through the crowd' },
+    { label: 'FIND ANOTHER WAY',cmd: 'look for another way across' },
+    { label: 'TALK TO PEOPLE', cmd: 'talk to the people on the bridge' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  highway: [
+    { label: 'LOOK',           cmd: 'look around' },
+    { label: 'KEEP MOVING',    cmd: 'keep moving toward the suburbs' },
+    { label: 'REST',           cmd: 'rest for a moment' },
+    { label: 'CHECK MAP',      cmd: 'check the paper map' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ],
+  suburb: [
+    { label: 'LOOK',           cmd: 'look around' },
+    { label: 'FIND FAMILY',    cmd: 'find my family' },
+    { label: 'INVENTORY',      cmd: 'check my inventory' },
+    { label: '? HELP',         cmd: null, action: 'help' }
+  ]
+};
+
+function updateHintButtons(locationStr) {
+  var key     = getSceneKey(locationStr || gameState.location);
+  var hints   = LOCATION_HINTS[key] || LOCATION_HINTS['default'];
+  var container = document.getElementById('quickActions');
+  if (!container) return;
+
+  container.innerHTML = ''; // clear old buttons
+
+  hints.forEach(function(hint) {
+    var btn = document.createElement('button');
+    btn.className   = 'quick-btn';
+    btn.textContent = hint.label;
+
+    if (hint.action === 'help') {
+      btn.onclick = function() { soundQuickBtn(); openHelp(); };
+    } else {
+      btn.onclick = (function(cmd) {
+        return function() { quickCmd(cmd); };
+      })(hint.cmd);
+    }
+
+    container.appendChild(btn);
+  });
+}
+
+// ════════════════════════════════════════════
 //  DAY MILESTONE MESSAGES
 // ════════════════════════════════════════════
 var DAY_MESSAGES = {
@@ -1701,7 +1831,11 @@ function parseResponse(raw) {
 }
 
 function applyParsed(p) {
-  if (p.location)  { gameState.location = p.location; setSceneByLocation(p.location); }
+  if (p.location) {
+    gameState.location = p.location;
+    setSceneByLocation(p.location);
+    updateHintButtons(p.location);
+  }
   if (p.morale  !== null) gameState.morale  = p.morale;
   if (p.hunger  !== null) gameState.hunger  = p.hunger;
   if (p.thirst  !== null) gameState.thirst  = p.thirst;
@@ -1954,6 +2088,7 @@ window.onload = function() {
       // Returning player — skip char select, go straight to game
       document.getElementById('gameScreen').style.display = 'block';
       setSceneByLocation(gameState.location);
+      updateHintButtons(gameState.location);
       var helpEl = document.getElementById('helpCharName');
       if (helpEl) helpEl.textContent = character.name;
       document.getElementById('cmdInput').focus();
