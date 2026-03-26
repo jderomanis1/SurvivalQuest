@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SURVIVAL QUEST</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green:      #00ff41;
+      --green-dim:  #00aa2a;
+      --green-dark: #001a00;
+      --green-glow: #00ff4133;
+      --amber:      #ffb000;
+      --amber-dim:  #996800;
+      --red:        #ff3333;
+      --bg:         #0a0a0a;
+      --bezel:      #1a1a1a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      padding: 16px;
+    }
+
+    .monitor {
+      width: 100%;
+      max-width: 680px;
+      background: var(--bezel);
+      border-radius: 18px;
+      padding: 20px 20px 16px;
+      box-shadow:
+        0 0 0 2px #333,
+        0 0 0 4px #111,
+        0 8px 60px #000,
+        inset 0 2px 4px #ffffff08;
+    }
+
+    .monitor-brand {
+      text-align: center;
+      font-family: 'VT323', monospace;
+      font-size: 0.68em;
+      color: #333;
+      letter-spacing: 6px;
+      margin-bottom: 10px;
+    }
+
+    .crt {
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      box-shadow:
+        inset 0 0 30px #000,
+        inset 0 0 60px var(--green-glow),
+        0 0 20px var(--green-glow);
+    }
+
+    .crt::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .crt::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.65) 100%);
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    .screen-header {
+      background: var(--green-dark);
+      border-bottom: 1px solid var(--green-glow);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .game-title {
+      font-family: 'VT323', monospace;
+      color: var(--green);
+      font-size: 1.4em;
+      letter-spacing: 4px;
+      text-shadow: 0 0 12px var(--green);
+      animation: flicker 8s infinite;
+    }
+
+    .header-badges { display: flex; gap: 8px; align-items: center; }
+
+    .badge {
+      font-size: 0.58em;
+      color: var(--green-dim);
+      border: 1px solid var(--green-glow);
+      padding: 2px 7px;
+      letter-spacing: 1px;
+    }
+
+    .badge.live {
+      color: var(--green);
+      border-color: var(--green-dim);
+      animation: pulse 2s infinite;
+    }
+
+    .game-body { display: flex; background: var(--green-dark); }
+
+    .story-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    .story {
+      flex: 1;
+      min-height: 280px;
+      max-height: 340px;
+      overflow-y: auto;
+      padding: 16px 18px;
+      color: var(--green);
+      font-size: 0.9em;
+      line-height: 1.75;
+      scrollbar-width: thin;
+      scrollbar-color: var(--green-dim) transparent;
+    }
+
+    .story::-webkit-scrollbar { width: 3px; }
+    .story::-webkit-scrollbar-thumb { background: var(--green-dim); }
+
+    .sidebar {
+      width: 160px;
+      flex-shrink: 0;
+      border-left: 1px solid var(--green-glow);
+      background: #000a00;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .panel-title {
+      font-family: 'VT323', monospace;
+      color: var(--green-dim);
+      font-size: 0.85em;
+      letter-spacing: 3px;
+      border-bottom: 1px solid var(--green-glow);
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+    }
+
+    .location-text { color: var(--amber); font-size: 0.72em; line-height: 1.5; }
+
+    .morale-track {
+      background: #001a00;
+      border: 1px solid var(--green-glow);
+      height: 10px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .morale-fill {
+      height: 100%;
+      background: var(--green);
+      transition: width 0.6s ease, background 0.6s ease;
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    .morale-label { color: var(--green-dim); font-size: 0.65em; margin-top: 4px; letter-spacing: 1px; }
+
+    .inv-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+
+    .inv-item {
+      color: var(--green);
+      font-size: 0.68em;
+      letter-spacing: 0.5px;
+      line-height: 1.4;
+      padding-left: 10px;
+      position: relative;
+    }
+
+    .inv-item::before { content: '▸'; position: absolute; left: 0; color: var(--green-dim); }
+    .inv-empty { color: #333; font-size: 0.65em; font-style: italic; }
+
+    .day-value {
+      font-family: 'VT323', monospace;
+      color: var(--amber);
+      font-size: 1.6em;
+      text-shadow: 0 0 8px var(--amber-dim);
+      letter-spacing: 2px;
+    }
+
+    .day-sub { color: #444; font-size: 0.6em; letter-spacing: 1px; margin-top: 2px; }
+
+    .input-area { background: #000; border-top: 1px solid var(--green-glow); padding: 12px 14px; }
+    .prompt-row { display: flex; align-items: center; gap: 10px; }
+
+    .prompt-symbol {
+      color: var(--amber);
+      font-family: 'VT323', monospace;
+      font-size: 1.35em;
+      flex-shrink: 0;
+      text-shadow: 0 0 8px var(--amber);
+    }
+
+    .cmd-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--amber);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.92em;
+      caret-color: var(--amber);
+    }
+
+    .cmd-input::placeholder { color: #444; font-style: italic; }
+    .cmd-input:disabled { opacity: 0.35; }
+
+    .go-btn {
+      background: transparent;
+      border: 1px solid var(--green-dim);
+      color: var(--green);
+      font-family: 'VT323', monospace;
+      font-size: 1.15em;
+      padding: 4px 14px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      transition: all 0.15s;
+    }
+
+    .go-btn:hover:not(:disabled) { background: var(--green); color: #000; box-shadow: 0 0 12px var(--green); }
+    .go-btn:disabled { opacity: 0.25; cursor: default; }
+
+    .screen-footer {
+      background: #000;
+      border-top: 1px solid #111;
+      padding: 5px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-txt { font-size: 0.6em; color: #333; letter-spacing: 1px; }
+
+    /* Boot screen */
+    #bootScreen {
+      display: none;
+      background: var(--green-dark);
+      padding: 24px 20px;
+      min-height: 280px;
+    }
+
+    .boot-line {
+      color: var(--green-dim);
+      font-size: 0.78em;
+      letter-spacing: 1px;
+      line-height: 1.9;
+      opacity: 0;
+      animation: fadeIn 0.1s forwards;
+    }
+
+    .boot-line.bright { color: var(--green); text-shadow: 0 0 6px var(--green-glow); }
+
+    .t-player   { color: var(--amber); }
+    .t-narrator { color: var(--green); text-shadow: 0 0 4px var(--green-glow); }
+    .t-err      { color: var(--red); }
+    .t-wait     { color: var(--green-dim); font-style: italic; }
+    .t-system   { color: #444; font-size: 0.78em; letter-spacing: 1px; }
+
+    .cursor {
+      display: inline-block; width: 9px; height: 1em;
+      background: var(--green); vertical-align: text-bottom;
+      margin-left: 2px; animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink   { 50% { opacity: 0; } }
+    @keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    @keyframes fadeIn  { to { opacity: 1; } }
+    @keyframes flicker { 0%,95%,100%{opacity:1;} 96%{opacity:.8;} 97%{opacity:1;} 98%{opacity:.6;} 99%{opacity:1;} }
+
+    #gameScreen { display: none; }
+
+    @media (max-width: 500px) {
+      .game-body { flex-direction: column; }
+      .sidebar {
+        width: 100%; border-left: none;
+        border-top: 1px solid var(--green-glow);
+        flex-direction: row; flex-wrap: wrap; gap: 10px; padding: 10px 12px;
+      }
+      .sidebar-section { flex: 1; min-width: 100px; }
+      .story { max-height: 260px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="monitor">
+  <div class="monitor-brand">VECTREX PRO 9000 &nbsp;&#9632;&nbsp; COLOR MONITOR</div>
+
+  <div class="crt">
+    <div class="screen-header">
+      <div class="game-title">&#9733; SURVIVAL QUEST &#9733;</div>
+      <div class="header-badges">
+        <div class="badge live">&#9679; LIVE</div>
+        <div class="badge">v3.0</div>
+      </div>
+    </div>
+
+    <!-- BOOT -->
+    <div id="bootScreen"><div id="bootLines"></div></div>
+
+    <!-- GAME — loads directly, no key screen needed -->
+    <div id="gameScreen">
+      <div class="game-body">
+
+        <div class="story-panel">
+          <div class="story" id="story">
+            <span class="t-system">// SURVIVAL QUEST &mdash; SESSION STARTED</span><br><br>
+            You wake up late. Again. Your hand slaps the nightstand
+            searching for your phone &mdash; dead. No alarm, no screen
+            glow, nothing. That's when you notice the ceiling fan has
+            stopped. The refrigerator hum you never think about&hellip;
+            gone. The power is out.<br><br>
+            You sit up and listen. Outside &mdash; no cars, no dogs, no
+            distant traffic. Just a silence so complete it has a
+            weight to it.<br><br>
+            Something has happened.<br><br>
+            <span class="cursor"></span>
+          </div>
+        </div>
+
+        <div class="sidebar">
+          <div class="sidebar-section">
+            <div class="panel-title">LOCATION</div>
+            <div class="location-text" id="locationText">BEDROOM<br>6th Floor Apt</div>
+          </div>
+          <div class="sidebar-section">
+            <div class="panel-title">MORALE</div>
+            <div class="morale-track">
+              <div class="morale-fill" id="moraleFill" style="width:75%"></div>
+            </div>
+            <div class="morale-label" id="moraleLabel">75 / 100</div>
+          </div>
+          <div class="sidebar-section">
+            <div class="panel-title">INVENTORY</div>
+            <ul class="inv-list" id="invList">
+              <li class="inv-empty">empty</li>
+            </ul>
+          </div>
+          <div class="sidebar-section">
+            <div class="panel-title">TIME</div>
+            <div class="day-value" id="dayValue">DAY 1</div>
+            <div class="day-sub" id="timeValue">09:14 AM</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="input-area">
+        <div class="prompt-row">
+          <div class="prompt-symbol">&gt;_</div>
+          <input id="cmdInput" class="cmd-input" placeholder="what do you do?" autocomplete="off" spellcheck="false" />
+          <button id="goBtn" class="go-btn">ENTER</button>
+        </div>
+      </div>
+
+      <div class="screen-footer">
+        <div class="footer-txt">&#9608; CITY SECTOR 7 &nbsp;|&nbsp; EMP EVENT DAY 1</div>
+        <div class="footer-txt">survivalquest.netlify.app</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var chatLog = [];
+
+  var SYSTEM = `You are the narrator of SURVIVAL QUEST, a text adventure game.
+
+== THE WORLD ==
+An enormous solar flare struck Earth at 3:47am, frying every electronic
+device on the planet simultaneously. No phones. No cars. No power grid.
+No internet. The event happened 6 hours ago. Nobody knows what caused it.
+
+== THE PLAYER ==
+The player is Alex, a completely average city office worker. Zero survival
+training. Owns one Swiss Army knife (still boxed, Secret Santa gift).
+Works at a mid-level insurance company. Needs to escape the city on foot
+and reach family in the suburbs 15 miles away.
+
+== KEY LOCATIONS ==
+- Alex's apartment: bedroom, kitchen, bathroom, living room
+- Apartment hallway and stairwell (no working elevator)
+- Street level: corner store, park, gas station
+- The bridge across the river (crowded with panicked people)
+- The highway on-ramp
+- The suburbs (the goal — 15 miles away)
+
+== ITEMS TO DISCOVER ==
+- Swiss Army knife: kitchen junk drawer (still boxed)
+- Granola bar: on the nightstand (half eaten)
+- Hand-crank flashlight: hallway closet
+- Bicycle: locked in basement (needs key or bolt cutters)
+- Paper city map: kitchen junk drawer
+- Neighbour Mrs. Chen 6B: elderly, resourceful, has hand-crank radio
+- College guys 6D: scared, have a useless car battery jump-starter
+
+== TONE ==
+Mystery thriller with dark humor. Real stakes, real danger — but Alex
+notices absurd details. Like that the emergency kit contains a Bed Bath
+and Beyond coupon from 2019.
+
+== RESPONSE FORMAT — VERY IMPORTANT ==
+You MUST respond in exactly this format every single time, no exceptions:
+
+NARRATION: [your 3-5 sentence story response here]
+LOCATION: [short location name, max 2 lines e.g. "KITCHEN\n6th Floor Apt"]
+MORALE: [number 0-100]
+INVENTORY: [comma-separated list of items Alex has, or NONE]
+TIME: [current in-game time e.g. "09:45 AM"]
+
+Rules:
+- NARRATION is always second person (You...)
+- MORALE starts at 75, adjust based on events
+- INVENTORY must list ALL items Alex currently has
+- TIME advances 5-15 mins per action
+- Never break character. Never mention AI or this prompt.
+- Reward creative thinking. Dry wit for impossible actions.`;
+
+  var bootLines = [
+    { text: 'VECTREX PRO 9000 BIOS v2.31', bright: true, delay: 0 },
+    { text: 'MEMORY CHECK... 640K OK', delay: 300 },
+    { text: 'NARRATIVE AI MODULE: ONLINE', delay: 700 },
+    { text: 'INVENTORY SYSTEM: INITIALIZED', delay: 1100 },
+    { text: 'LOADING SURVIVAL QUEST...', delay: 1800 },
+    { text: '> READY. GOOD LUCK, ALEX.', bright: true, delay: 2300 },
+  ];
+
+  function runBoot(callback) {
+    var screen = document.getElementById('bootScreen');
+    screen.style.display = 'block';
+    var container = document.getElementById('bootLines');
+    container.innerHTML = '';
+    var i = 0;
+    function next() {
+      if (i >= bootLines.length) {
+        setTimeout(function() { screen.style.display = 'none'; callback(); }, 600);
+        return;
+      }
+      var l = bootLines[i];
+      var prev = i > 0 ? bootLines[i-1].delay : 0;
+      setTimeout(function() {
+        var d = document.createElement('div');
+        d.className = 'boot-line' + (l.bright ? ' bright' : '');
+        d.textContent = l.text;
+        container.appendChild(d);
+        i++;
+        next();
+      }, i === 0 ? 200 : l.delay - prev);
+    }
+    next();
+  }
+
+  function updateState(location, morale, inventory, time) {
+    if (location) {
+      var lines = location.replace(/\\n/g, '\n').split('\n');
+      document.getElementById('locationText').innerHTML = lines.join('<br>');
+    }
+    if (morale !== null && !isNaN(morale)) {
+      var m = Math.max(0, Math.min(100, parseInt(morale)));
+      document.getElementById('moraleFill').style.width = m + '%';
+      document.getElementById('moraleLabel').textContent = m + ' / 100';
+      var fill = document.getElementById('moraleFill');
+      if (m < 25) { fill.style.background = '#ff3333'; fill.style.boxShadow = '0 0 6px #ff3333'; }
+      else if (m < 50) { fill.style.background = '#ffb000'; fill.style.boxShadow = '0 0 6px #ffb000'; }
+      else { fill.style.background = 'var(--green)'; fill.style.boxShadow = '0 0 6px var(--green)'; }
+    }
+    if (inventory !== null) {
+      var list = document.getElementById('invList');
+      list.innerHTML = '';
+      if (!inventory || inventory.trim() === '' || inventory.toUpperCase() === 'NONE') {
+        list.innerHTML = '<li class="inv-empty">empty</li>';
+      } else {
+        inventory.split(',').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(item) {
+          var li = document.createElement('li');
+          li.className = 'inv-item';
+          li.textContent = item;
+          list.appendChild(li);
+        });
+      }
+    }
+    if (time) document.getElementById('timeValue').textContent = time;
+  }
+
+  function parseResponse(raw) {
+    var result = { narration: '', location: null, morale: null, inventory: null, time: null };
+    var narMatch  = raw.match(/NARRATION:\s*([\s\S]*?)(?=\nLOCATION:|\nMORALE:|\nINVENTORY:|\nTIME:|$)/i);
+    var locMatch  = raw.match(/LOCATION:\s*(.+)/i);
+    var morMatch  = raw.match(/MORALE:\s*(\d+)/i);
+    var invMatch  = raw.match(/INVENTORY:\s*(.+)/i);
+    var timeMatch = raw.match(/TIME:\s*(.+)/i);
+    if (narMatch)  result.narration = narMatch[1].trim();
+    if (locMatch)  result.location  = locMatch[1].trim();
+    if (morMatch)  result.morale    = parseInt(morMatch[1]);
+    if (invMatch)  result.inventory = invMatch[1].trim();
+    if (timeMatch) result.time      = timeMatch[1].trim();
+    if (!result.narration) result.narration = raw.trim();
+    return result;
+  }
+
+  window.onload = function() {
+    runBoot(function() {
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('cmdInput').focus();
+    });
+  };
+
+  document.getElementById('goBtn').addEventListener('click', sendCommand);
+  document.getElementById('cmdInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') sendCommand();
+  });
+
+  function addLine(html, cls) {
+    var s = document.getElementById('story');
+    var span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.innerHTML = html;
+    s.appendChild(span);
+    s.scrollTop = s.scrollHeight;
+  }
+
+  function sendCommand() {
+    var input = document.getElementById('cmdInput');
+    var goBtn = document.getElementById('goBtn');
+    var val = input.value.trim();
+    if (!val || goBtn.disabled) return;
+
+    input.value = '';
+    input.disabled = true;
+    goBtn.disabled = true;
+
+    addLine('<br>', '');
+    addLine('&gt; ' + val + '<br>', 't-player');
+
+    var waitId = 'w' + Date.now();
+    var waitEl = document.createElement('span');
+    waitEl.id = waitId;
+    waitEl.className = 't-wait';
+    waitEl.textContent = '.';
+    document.getElementById('story').appendChild(waitEl);
+    document.getElementById('story').scrollTop = 99999;
+
+    var dotCount = 0;
+    var dotInterval = setInterval(function() {
+      var el = document.getElementById(waitId);
+      if (el) { dotCount++; el.textContent = '.'.repeat((dotCount % 3) + 1); }
+    }, 400);
+
+    chatLog.push({ role: 'user', content: val });
+
+    function done() {
+      clearInterval(dotInterval);
+      input.disabled = false;
+      goBtn.disabled = false;
+      input.focus();
+      document.getElementById('story').scrollTop = 99999;
+    }
+
+    // ── Call OUR Netlify function, not Anthropic directly ──
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/.netlify/functions/claude', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.timeout = 20000;
+
+    xhr.onload = function() {
+      var el = document.getElementById(waitId);
+      try {
+        var data = JSON.parse(xhr.responseText);
+        if (data.error) {
+          if (el) el.remove();
+          addLine('ERROR: ' + data.error.message + '<br>', 't-err');
+          chatLog.pop();
+        } else {
+          var raw = data.content[0].text;
+          chatLog.push({ role: 'assistant', content: raw });
+          var parsed = parseResponse(raw);
+          updateState(parsed.location, parsed.morale, parsed.inventory, parsed.time);
+          if (el) el.remove();
+          addLine(parsed.narration + '<br><span class="cursor"></span>', 't-narrator');
+        }
+      } catch(e) {
+        if (el) el.remove();
+        addLine('PARSE ERROR: ' + e.message + '<br>', 't-err');
+        chatLog.pop();
+      }
+      done();
+    };
+
+    xhr.onerror = function() {
+      clearInterval(dotInterval);
+      var el = document.getElementById(waitId);
+      if (el) el.remove();
+      addLine('NETWORK ERROR &mdash; Could not reach game server.<br>', 't-err');
+      chatLog.pop();
+      done();
+    };
+
+    xhr.ontimeout = function() {
+      clearInterval(dotInterval);
+      var el = document.getElementById(waitId);
+      if (el) el.remove();
+      addLine('TIMEOUT &mdash; No response after 20 seconds.<br>', 't-err');
+      chatLog.pop();
+      done();
+    };
+
+    xhr.send(JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      system: SYSTEM,
+      messages: chatLog
+    }));
+  }
+</script>
+</body>
+</html>
