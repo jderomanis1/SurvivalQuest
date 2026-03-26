@@ -206,20 +206,59 @@
     .fill-amber  { background: var(--amber);  color: var(--amber); }
     .fill-red    { background: var(--red);    color: var(--red); }
 
-    /* Inventory */
-    .inv-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-
-    .inv-item {
-      color: var(--green);
-      font-size: 0.65em;
-      letter-spacing: 0.5px;
-      line-height: 1.4;
-      padding-left: 10px;
-      position: relative;
+    /* Inventory grid */
+    .inv-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-top: 4px;
     }
 
-    .inv-item::before { content: '▸'; position: absolute; left: 0; color: var(--green-dim); }
-    .inv-empty { color: #333; font-size: 0.63em; font-style: italic; }
+    .inv-slot {
+      border: 1px solid #0d2a0d;
+      background: #000500;
+      min-height: 42px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3px 2px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+
+    .inv-slot.filled {
+      border-color: var(--green-dim);
+      background: #001a00;
+      cursor: default;
+    }
+
+    .inv-slot.filled:hover {
+      border-color: var(--green);
+      box-shadow: 0 0 6px var(--green-glow);
+    }
+
+    .inv-slot-icon {
+      font-size: 0.9em;
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    .inv-slot-name {
+      color: var(--green);
+      font-size: 0.48em;
+      letter-spacing: 0.5px;
+      text-align: center;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .inv-slot-empty-dot {
+      width: 3px;
+      height: 3px;
+      background: #0d2a0d;
+      border-radius: 50%;
+    }
 
     /* Time / Day */
     .day-value {
@@ -608,9 +647,9 @@
        ASCII SCENE ART PANEL
     ═══════════════════════════════ */
     .scene-panel {
-      background: #000500;
-      border-bottom: 1px solid var(--green-glow);
-      padding: 8px 14px 6px;
+      background: #000800;
+      border-bottom: 1px solid var(--green-dim);
+      padding: 10px 14px 8px;
       display: flex;
       align-items: flex-start;
       gap: 12px;
@@ -618,26 +657,27 @@
     }
 
     .scene-art {
-      font-size: 0.52em;
-      line-height: 1.25;
+      font-size: 0.62em;
+      line-height: 1.3;
       white-space: pre;
-      color: var(--green-dim);
-      text-shadow: 0 0 3px var(--green-glow);
+      color: var(--green);
+      text-shadow: 0 0 6px var(--green);
       flex-shrink: 0;
-      opacity: 0.85;
+      opacity: 1;
+      letter-spacing: 0.5px;
     }
 
     .scene-caption {
-      font-size: 0.6em;
-      color: #2a4a2a;
+      font-size: 0.65em;
+      color: var(--green-dim);
       letter-spacing: 1px;
-      line-height: 1.6;
-      padding-top: 2px;
+      line-height: 1.7;
+      padding-top: 4px;
       font-style: italic;
     }
 
     @media (max-width: 520px) {
-      .scene-art { font-size: 0.46em; }
+      .scene-art { font-size: 0.55em; }
       .scene-panel { padding: 6px 10px 4px; min-height: 60px; }
     }
 
@@ -878,10 +918,10 @@
           </div>
 
           <div class="sidebar-section">
-            <div class="panel-title">INVENTORY</div>
-            <ul class="inv-list" id="invList">
-              <li class="inv-empty">empty</li>
-            </ul>
+            <div class="panel-title">INVENTORY <span id="invCount" style="color:#333;font-size:0.8em;">0/6</span></div>
+            <div class="inv-grid" id="invGrid">
+              <!-- slots injected by JS -->
+            </div>
           </div>
 
           <div class="sidebar-section">
@@ -1442,21 +1482,8 @@ function applyState() {
   setStat('thirst',  gameState.thirst);
   setStat('energy',  gameState.energy);
 
-  // Inventory
-  var list = document.getElementById('invList');
-  list.innerHTML = '';
-  var inv = gameState.inventory;
-  if (!inv || inv.length === 0) {
-    list.innerHTML = '<li class="inv-empty">empty</li>';
-  } else {
-    inv.forEach(function(item) {
-      if (!item.trim()) return;
-      var li = document.createElement('li');
-      li.className = 'inv-item';
-      li.textContent = item.trim();
-      list.appendChild(li);
-    });
-  }
+  // Inventory grid
+  renderInventoryGrid(gameState.inventory);
 
   // Time / Day
   document.getElementById('dayValue').textContent = 'DAY ' + (gameState.day || 1);
@@ -1474,6 +1501,68 @@ function setStat(name, val) {
   fill.style.width = val + '%';
   fill.className = 'stat-fill ' +
     (val < 25 ? 'fill-red' : val < 50 ? 'fill-amber' : 'fill-green');
+}
+
+// ── Item icon lookup ─────────────────────────
+function getItemIcon(name) {
+  var n = name.toLowerCase();
+  if (n.indexOf('knife')  !== -1 || n.indexOf('blade') !== -1) return '🔪';
+  if (n.indexOf('flash')  !== -1 || n.indexOf('light') !== -1) return '🔦';
+  if (n.indexOf('map')    !== -1)                               return '🗺️';
+  if (n.indexOf('water')  !== -1 || n.indexOf('bottle') !== -1) return '💧';
+  if (n.indexOf('food')   !== -1 || n.indexOf('granola') !== -1
+   || n.indexOf('bar')    !== -1 || n.indexOf('snack') !== -1)  return '🍫';
+  if (n.indexOf('radio')  !== -1)                               return '📻';
+  if (n.indexOf('bike')   !== -1 || n.indexOf('bicycle') !== -1) return '🚲';
+  if (n.indexOf('key')    !== -1)                               return '🔑';
+  if (n.indexOf('bolt')   !== -1 || n.indexOf('cutter') !== -1) return '✂️';
+  if (n.indexOf('phone')  !== -1)                               return '📱';
+  if (n.indexOf('first')  !== -1 || n.indexOf('aid') !== -1)    return '🩹';
+  if (n.indexOf('rope')   !== -1)                               return '🪢';
+  if (n.indexOf('match')  !== -1 || n.indexOf('lighter') !== -1) return '🔥';
+  if (n.indexOf('bag')    !== -1 || n.indexOf('pack') !== -1)   return '🎒';
+  return '📦'; // default
+}
+
+// ── Render 6-slot inventory grid ─────────────
+var MAX_SLOTS = 6;
+
+function renderInventoryGrid(inv) {
+  var grid  = document.getElementById('invGrid');
+  var count = document.getElementById('invCount');
+  if (!grid) return;
+
+  var items = (inv || []).filter(function(i){ return i && i.trim(); });
+  grid.innerHTML = '';
+
+  // Update count label
+  if (count) count.textContent = items.length + '/' + MAX_SLOTS;
+
+  for (var i = 0; i < MAX_SLOTS; i++) {
+    var slot = document.createElement('div');
+    if (i < items.length) {
+      slot.className = 'inv-slot filled';
+      var icon = document.createElement('div');
+      icon.className = 'inv-slot-icon';
+      icon.textContent = getItemIcon(items[i]);
+      var label = document.createElement('div');
+      label.className = 'inv-slot-name';
+      // Truncate long names to keep slots tidy
+      var displayName = items[i].trim();
+      if (displayName.length > 10) displayName = displayName.substring(0, 9) + '…';
+      label.textContent = displayName;
+      slot.appendChild(icon);
+      slot.appendChild(label);
+      // Tooltip with full name on hover
+      slot.title = items[i].trim();
+    } else {
+      slot.className = 'inv-slot';
+      var dot = document.createElement('div');
+      dot.className = 'inv-slot-empty-dot';
+      slot.appendChild(dot);
+    }
+    grid.appendChild(slot);
+  }
 }
 
 // ════════════════════════════════════════════
@@ -1677,6 +1766,14 @@ function sendCommand() {
   xhr.onload = function() {
     var el = document.getElementById(waitId);
     try {
+      // If Netlify returns an HTML error page instead of JSON
+      if (xhr.responseText.trim().charAt(0) === '<') {
+        if (el) el.remove();
+        addLine('SERVER ERROR (code ' + xhr.status + ') &mdash; Try your command again in a moment.<br>', 't-err');
+        chatLog.pop();
+        done();
+        return;
+      }
       var data = JSON.parse(xhr.responseText);
       if (data.error) {
         if (el) el.remove();
