@@ -1,0 +1,4 @@
+[build]
+  base      = "SQ"
+  publish   = "SQ"
+  functions = "SQ/netlify/functions"
