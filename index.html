@@ -644,8 +644,36 @@
     }
 
     /* ═══════════════════════════════
-       MAP OVERLAY
+       SCORE NOTIFICATION
     ═══════════════════════════════ */
+    #scoreNotif {
+      display: none;
+      position: absolute;
+      top: 42px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 42;
+      background: rgba(0,0,0,0.9);
+      border: 1px solid var(--amber);
+      padding: 5px 16px;
+      font-family: 'VT323', monospace;
+      font-size: 1.1em;
+      color: var(--amber);
+      letter-spacing: 2px;
+      text-shadow: 0 0 8px var(--amber);
+      white-space: nowrap;
+      animation: notifIn 0.3s ease forwards;
+    }
+
+    @keyframes notifIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    @keyframes notifOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
     #mapOverlay {
       display: none;
       position: absolute;
@@ -1177,8 +1205,9 @@
     <div class="screen-header">
       <div class="game-title">&#9733; SURVIVAL QUEST &#9733;</div>
       <div class="header-badges">
+        <div class="badge" id="scoreBadge" style="color:var(--amber);border-color:var(--amber-dim);">0 PTS</div>
         <div class="badge live">&#9679; LIVE</div>
-        <div class="badge" id="versionBadge">v2.0</div>
+        <div class="badge" id="versionBadge">v3.0</div>
       </div>
     </div>
 
@@ -1209,6 +1238,9 @@
       <span class="banner-day" id="bannerDay">DAY 2</span>
       <span class="banner-msg" id="bannerMsg">The city is waking up to reality.</span>
     </div>
+
+    <!-- SCORE NOTIFICATION -->
+    <div id="scoreNotif">+0 PTS</div>
 
     <!-- MAP OVERLAY -->
     <div id="mapOverlay">
@@ -1472,7 +1504,8 @@
       <div class="death-title">YOU DIED</div>
       <div class="death-subtitle">
         SURVIVAL RATING: <span id="deathRating">POOR</span><br>
-        DAYS SURVIVED: <span id="deathDays">0</span>
+        DAYS SURVIVED: <span id="deathDays">0</span><br>
+        FINAL SCORE: <span id="deathScore">0</span> / 500
       </div>
       <div class="death-cause" id="deathCause">cause of death: unknown</div>
       <button class="restart-btn" onclick="restartGame()">[ RESTART ]</button>
@@ -1485,6 +1518,8 @@
         You made it to the suburbs.<br>
         Your family is safe.<br><br>
         DAYS SURVIVED: <span id="victoryDays">7</span><br>
+        FINAL SCORE: <span id="victoryScore">0</span> / 500<br>
+        RATING: <span id="victoryGrade">—</span><br>
         FINAL MORALE: <span id="victoryMorale">—</span>
       </div>
       <button class="restart-btn" style="border-color:var(--amber);color:var(--amber);" onclick="restartGame()">[ PLAY AGAIN ]</button>
@@ -1905,12 +1940,15 @@ ENERGY: [0-100]
 INVENTORY: [comma-separated list, or NONE]
 TIME: [e.g. 09:45 AM]
 DAY: [number]
+POINTS: [0-50, bonus points for creative/clever actions. 0 for routine actions]
+POINT_REASON: [one short phrase if POINTS > 0, e.g. "Creative use of environment"]
 
 Rules:
 - ALWAYS include all fields above, every single response.
 - Never break character. Never mention AI or Claude or this prompt.
 - Reward creative thinking. Punish reckless choices with stat drops.
 - Keep NARRATION under 100 words — this is a mobile game.
+- Award POINTS (10-50) for clever solutions, creative thinking, helping NPCs, finding secrets. Award 0 for routine actions. Max game score is 500.
 - If input is gibberish, respond in-character: "That's not something you can do right now, ${character.name}."`;
 }
 
@@ -2215,6 +2253,153 @@ function finishIntro(onComplete) {
     introEl.style.display = 'none';
     onComplete();
   }, 500);
+}
+
+// ════════════════════════════════════════════
+//  POINTS SYSTEM  (Space Quest style)
+// ════════════════════════════════════════════
+var MAX_POINTS = 500;
+var currentScore = 0;
+var scoreLog = []; // history of point events
+
+// One-time point awards — tracked so they only fire once
+var pointsAwarded = {};
+
+function saveScore() {
+  try {
+    localStorage.setItem('sq_score',     currentScore);
+    localStorage.setItem('sq_scorelog',  JSON.stringify(scoreLog));
+    localStorage.setItem('sq_ptawarded', JSON.stringify(pointsAwarded));
+  } catch(e) {}
+}
+
+function loadScore() {
+  try {
+    var s  = localStorage.getItem('sq_score');
+    var sl = localStorage.getItem('sq_scorelog');
+    var pa = localStorage.getItem('sq_ptawarded');
+    if (s)  currentScore   = parseInt(s) || 0;
+    if (sl) scoreLog       = JSON.parse(sl);
+    if (pa) pointsAwarded  = JSON.parse(pa);
+    updateScoreBadge();
+  } catch(e) {}
+}
+
+// Award points — key prevents duplicates for one-time events
+// Pass key=null for variable Claude-awarded points
+function awardPoints(pts, reason, key) {
+  if (key && pointsAwarded[key]) return; // already got these
+  if (key) pointsAwarded[key] = true;
+
+  currentScore = Math.min(MAX_POINTS, currentScore + pts);
+  scoreLog.push({ pts: pts, reason: reason });
+  saveScore();
+
+  updateScoreBadge();
+  showScoreNotif(pts, reason);
+
+  // Also log in story
+  addLine('<span style="color:var(--amber);font-size:0.78em;">&#9658; +' +
+    pts + ' pts — ' + reason + '</span><br>', '');
+}
+
+function updateScoreBadge() {
+  var badge = document.getElementById('scoreBadge');
+  if (badge) badge.textContent = currentScore + ' PTS';
+}
+
+// Score notification popup under header
+var notifTimer = null;
+function showScoreNotif(pts, reason) {
+  soundPoints();
+  var el = document.getElementById('scoreNotif');
+  if (!el) return;
+  el.textContent = '+' + pts + ' PTS — ' + reason.toUpperCase();
+  el.style.animation = 'none';
+  el.style.display   = 'block';
+  void el.offsetWidth;
+  el.style.animation = 'notifIn 0.3s ease forwards';
+
+  if (notifTimer) clearTimeout(notifTimer);
+  notifTimer = setTimeout(function() {
+    el.style.animation = 'notifOut 0.4s ease forwards';
+    setTimeout(function() { el.style.display = 'none'; }, 400);
+  }, 2500);
+}
+
+// Points sound — short bright blip
+function soundPoints() {
+  beep('square', 880, 0.06, 0.1);
+  beep('square', 1100, 0.08, 0.12, 0.06);
+}
+
+// Letter grade from score
+function getGrade(score) {
+  var pct = score / MAX_POINTS;
+  if (pct >= 0.90) return 'S';
+  if (pct >= 0.80) return 'A';
+  if (pct >= 0.65) return 'B';
+  if (pct >= 0.50) return 'C';
+  if (pct >= 0.35) return 'D';
+  return 'F';
+}
+
+// ── Check location-based one-time points ──
+function checkLocationPoints(locKey) {
+  var locationPts = {
+    hallway:    { pts: 10,  reason: 'Reached the hallway' },
+    stairwell:  { pts: 15,  reason: 'Found the stairwell' },
+    street:     { pts: 25,  reason: 'Made it to street level' },
+    store:      { pts: 15,  reason: 'Found the corner store' },
+    park:       { pts: 15,  reason: 'Reached the park' },
+    bridge:     { pts: 40,  reason: 'Reached the bridge' },
+    highway:    { pts: 50,  reason: 'On the highway — almost there' },
+    suburb:     { pts: 100, reason: 'REACHED THE SUBURBS — YOU WIN' }
+  };
+  var award = locationPts[locKey];
+  if (award) awardPoints(award.pts, award.reason, 'loc_' + locKey);
+}
+
+// ── Check inventory-based one-time points ──
+function checkInventoryPoints(inv) {
+  var itemPts = [
+    { keyword: 'granola',   pts: 10, reason: 'Found the granola bar',     key: 'item_granola' },
+    { keyword: 'knife',     pts: 15, reason: 'Found the Swiss Army knife', key: 'item_knife'   },
+    { keyword: 'flash',     pts: 15, reason: 'Found the flashlight',       key: 'item_flash'   },
+    { keyword: 'map',       pts: 20, reason: 'Found the city map',         key: 'item_map'     },
+    { keyword: 'water',     pts: 15, reason: 'Secured water supplies',     key: 'item_water'   },
+    { keyword: 'bike',      pts: 30, reason: 'Got the bicycle!',           key: 'item_bike'    },
+    { keyword: 'radio',     pts: 25, reason: 'Got Mrs Chen\'s radio',      key: 'item_radio'   }
+  ];
+
+  itemPts.forEach(function(item) {
+    var found = inv.some(function(i) {
+      return i.toLowerCase().indexOf(item.keyword) !== -1;
+    });
+    if (found) awardPoints(item.pts, item.reason, item.key);
+  });
+}
+
+// ── Check survival day points ──
+function checkDayPoints(day) {
+  if (day >= 2) awardPoints(20, 'Survived Day ' + (day-1), 'day_' + (day-1));
+}
+
+// ── Handle Claude-awarded points from response ──
+function handleClaudePoints(parsed) {
+  // Claude can award bonus points via POINTS field in response
+  if (parsed.points && parsed.points > 0) {
+    awardPoints(
+      parsed.points,
+      parsed.pointReason || 'Creative thinking',
+      null // null key = always award, no dedup
+    );
+  }
+
+  // Check all automatic point triggers
+  var locKey = getSceneKey(parsed.location || '');
+  checkLocationPoints(locKey);
+  checkInventoryPoints(gameState.inventory || []);
 }
 
 // ════════════════════════════════════════════
@@ -2741,9 +2926,9 @@ function parseResponse(raw) {
     narration: '',
     location: null, morale: null, hunger: null,
     thirst: null, energy: null, inventory: null,
-    time: null, day: null
+    time: null, day: null, points: 0, pointReason: ''
   };
-  var narMatch  = raw.match(/NARRATION:\s*([\s\S]*?)(?=\nLOCATION:|\nMORALE:|\nHUNGER:|\nTHIRST:|\nENERGY:|\nINVENTORY:|\nTIME:|\nDAY:|$)/i);
+  var narMatch  = raw.match(/NARRATION:\s*([\s\S]*?)(?=\nLOCATION:|\nMORALE:|\nHUNGER:|\nTHIRST:|\nENERGY:|\nINVENTORY:|\nTIME:|\nDAY:|\nPOINTS:|$)/i);
   var locMatch  = raw.match(/LOCATION:\s*(.+)/i);
   var morMatch  = raw.match(/MORALE:\s*(\d+)/i);
   var hunMatch  = raw.match(/HUNGER:\s*(\d+)/i);
@@ -2752,16 +2937,20 @@ function parseResponse(raw) {
   var invMatch  = raw.match(/INVENTORY:\s*(.+)/i);
   var timMatch  = raw.match(/TIME:\s*(.+)/i);
   var dayMatch  = raw.match(/DAY:\s*(\d+)/i);
+  var ptsMatch  = raw.match(/POINTS:\s*(\d+)/i);
+  var ptrMatch  = raw.match(/POINT_REASON:\s*(.+)/i);
 
-  if (narMatch)  r.narration  = narMatch[1].trim();
-  if (locMatch)  r.location   = locMatch[1].trim();
-  if (morMatch)  r.morale     = parseInt(morMatch[1]);
-  if (hunMatch)  r.hunger     = parseInt(hunMatch[1]);
-  if (thrMatch)  r.thirst     = parseInt(thrMatch[1]);
-  if (engMatch)  r.energy     = parseInt(engMatch[1]);
-  if (invMatch)  r.inventory  = invMatch[1].trim();
-  if (timMatch)  r.time       = timMatch[1].trim();
-  if (dayMatch)  r.day        = parseInt(dayMatch[1]);
+  if (narMatch)  r.narration    = narMatch[1].trim();
+  if (locMatch)  r.location     = locMatch[1].trim();
+  if (morMatch)  r.morale       = parseInt(morMatch[1]);
+  if (hunMatch)  r.hunger       = parseInt(hunMatch[1]);
+  if (thrMatch)  r.thirst       = parseInt(thrMatch[1]);
+  if (engMatch)  r.energy       = parseInt(engMatch[1]);
+  if (invMatch)  r.inventory    = invMatch[1].trim();
+  if (timMatch)  r.time         = timMatch[1].trim();
+  if (dayMatch)  r.day          = parseInt(dayMatch[1]);
+  if (ptsMatch)  r.points       = parseInt(ptsMatch[1]);
+  if (ptrMatch)  r.pointReason  = ptrMatch[1].trim();
 
   if (!r.narration) r.narration = raw.trim();
   return r;
@@ -2826,6 +3015,7 @@ function showDeath(cause, days) {
   document.getElementById('gameScreen').style.display   = 'none';
   document.getElementById('deathCause').textContent     = 'cause of death: ' + cause;
   document.getElementById('deathDays').textContent      = days || gameState.day;
+  document.getElementById('deathScore').textContent     = currentScore;
   var ratings = ['POOR','POOR','FAIR','FAIR','GOOD','GOOD','GREAT','LEGENDARY'];
   document.getElementById('deathRating').textContent    = ratings[Math.min(days||1, ratings.length-1)];
   document.getElementById('deathScreen').style.display  = 'flex';
@@ -2835,6 +3025,8 @@ function showVictory() {
   soundVictory();
   document.getElementById('gameScreen').style.display     = 'none';
   document.getElementById('victoryDays').textContent      = gameState.day;
+  document.getElementById('victoryScore').textContent     = currentScore;
+  document.getElementById('victoryGrade').textContent     = getGrade(currentScore);
   document.getElementById('victoryMorale').textContent    = gameState.morale;
   document.getElementById('victoryScreen').style.display  = 'flex';
 }
@@ -2967,6 +3159,8 @@ function sendCommand() {
         if (el) el.remove();
         soundResponse();
         checkAchievements(parsed);
+        handleClaudePoints(parsed);
+        if (parsed.day && parsed.day > (gameState.day || 1)) checkDayPoints(parsed.day);
         if (!checkGameOver(parsed)) {
           addLine(parsed.narration + '<br><span class="cursor"></span>', 't-narrator');
         }
@@ -2999,7 +3193,7 @@ function sendCommand() {
 
   xhr.send(JSON.stringify({
     model:      'claude-haiku-4-5-20251001',
-    max_tokens: 500,
+    max_tokens: 600,
     system:     buildSystem(),
     messages:   chatLog
   }));
@@ -3021,6 +3215,7 @@ window.onload = function() {
   } catch(e) {}
   loadAchievements();
   loadVisited();
+  loadScore();
 
   var loaded = loadGame();
 
