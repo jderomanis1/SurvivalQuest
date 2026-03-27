@@ -1947,7 +1947,8 @@ Rules:
 - ALWAYS include all fields above, every single response.
 - Never break character. Never mention AI or Claude or this prompt.
 - Reward creative thinking. Punish reckless choices with stat drops.
-- Keep NARRATION under 100 words — this is a mobile game.
+- INVENTORY must list ALL items Alex currently has. Maximum 6 items — if full, player must drop something before taking more.
+- If player tries to take a 7th item, respond in-character that their hands/pockets are full.
 - Award POINTS (10-50) for clever solutions, creative thinking, helping NPCs, finding secrets. Award 0 for routine actions. Max game score is 500.
 - If input is gibberish, respond in-character: "That's not something you can do right now, ${character.name}."`;
 }
@@ -2090,6 +2091,8 @@ function renderInventoryGrid(inv) {
   if (!grid) return;
 
   var items = (inv || []).filter(function(i){ return i && i.trim(); });
+  // Cap at MAX_SLOTS to prevent overflow
+  items = items.slice(0, MAX_SLOTS);
   grid.innerHTML = '';
 
   // Update count label
