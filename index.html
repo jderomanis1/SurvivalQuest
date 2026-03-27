@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DEAD RECKONING</title>
+  <title>DARK COMMUTE</title>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -1314,13 +1314,13 @@
 <body>
 
 <div class="monitor">
-  <div class="monitor-brand">VECTREX PRO 9000 &nbsp;&#9632;&nbsp; DEAD RECKONING TERMINAL</div>
+  <div class="monitor-brand">VECTREX PRO 9000 &nbsp;&#9632;&nbsp; DARK COMMUTE TERMINAL</div>
 
   <div class="crt" style="position:relative;">
 
     <!-- HEADER -->
     <div class="screen-header">
-      <div class="game-title">&#9733; DEAD RECKONING &#9733;</div>
+      <div class="game-title">&#9733; DARK COMMUTE &#9733;</div>
       <div class="header-badges">
         <div class="badge" id="scoreBadge" style="color:var(--amber);border-color:var(--amber-dim);">0 PTS</div>
         <div class="badge live">&#9679; LIVE</div>
@@ -1333,7 +1333,8 @@
       <div class="help-title">&#9673; HOW TO PLAY</div>
       <div class="help-body">
         You are <span id="helpCharName">your survivor</span> — stranded in your apartment after a
-        citywide EMP event. Your goal: reach your family in the suburbs
+        citywide blackout. Your goal: survive the commute home —
+        reach your family in the suburbs
         <span>15 miles away</span>. You have <span>7 days</span> before
         resources run out.<br><br>
         <span>TYPE commands</span> like a real adventure game:<br>
@@ -1362,7 +1363,7 @@
     <!-- MAP OVERLAY -->
     <div id="mapOverlay">
       <div class="map-header">
-        <div class="map-title">&#9638; CITY SECTOR 7 — AREA MAP</div>
+        <div class="map-title">&#9638; COMMUTE MAP — CITY GRID</div>
         <button class="map-close" onclick="toggleMap()">[ CLOSE ]</button>
       </div>
       <div class="map-legend">
@@ -1393,7 +1394,7 @@
           <div class="emp-ring" style="animation-delay:0.4s"></div>
           <div class="emp-ring" style="animation-delay:0.6s"></div>
         </div>
-        <div class="intro-event-text">SOLAR FLARE — EMP EVENT</div>
+        <div class="intro-event-text">SOLAR FLARE — TOTAL BLACKOUT</div>
         <div class="intro-event-sub">Every device. Every car. Every light.</div>
       </div>
 
@@ -1406,9 +1407,9 @@
       <!-- PANEL 4: Title Card -->
       <div class="intro-panel" id="introP4" style="display:none;">
         <div class="intro-title-star">&#9733;</div>
-        <div class="intro-title">DEAD RECKONING</div>
+        <div class="intro-title">DARK COMMUTE</div>
         <div class="intro-title-star">&#9733;</div>
-        <div class="intro-tagline">"No signal. No map. No choice."</div>
+        <div class="intro-tagline">"The worst commute of your life."</div>
         <div class="intro-skip">[ TAP TO SKIP ]</div>
       </div>
 
@@ -1517,7 +1518,7 @@
             <div class="scene-caption" id="sceneCaption"></div>
           </div>
           <div class="story" id="story">
-            <span class="t-system">// DEAD RECKONING — SESSION STARTED</span><br><br>
+            <span class="t-system">// DARK COMMUTE — SESSION STARTED</span><br><br>
             You wake up late. Again. Your hand slaps the nightstand
             searching for your phone &mdash; dead. No alarm, no screen
             glow, nothing. That&rsquo;s when you notice the ceiling fan has
@@ -1609,7 +1610,7 @@
 
       <!-- FOOTER -->
       <div class="screen-footer">
-        <div class="footer-txt" id="footerSector">&#9608; CITY SECTOR 7 &nbsp;|&nbsp; EMP EVENT DAY 1</div>
+        <div class="footer-txt" id="footerSector">&#9608; DARK COMMUTE &nbsp;|&nbsp; BLACKOUT DAY 1</div>
         <div class="footer-save" id="turnCounter" onclick="onTurnCounterClick()" title="Daily turns remaining" style="color:var(--green-dim);cursor:pointer;">&#9632; 20 LEFT</div>
         <div class="footer-save" onclick="clearSave()" title="Reset game">&#9673; RESET</div>
         <div class="footer-save" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#9834; SFX ON</div>
@@ -1643,10 +1644,10 @@
         <div id="unlockError" class="unlock-error"></div>
         <div class="limit-donate">
           Get your unlock code instantly after payment:<br>
-          <span style="color:var(--amber);">gumroad.com/l/deadreckoning</span><br>
+          <span style="color:var(--amber);">gumroad.com/l/darkcommute</span><br>
           <span style="color:var(--green);font-size:1.1em;letter-spacing:2px;">$2.99 — one time — play forever</span>
         </div>
-        <button class="unlock-btn" style="border-color:var(--green-dim);color:var(--green-dim);font-size:0.9em;margin-top:4px;" onclick="window.open('https://gumroad.com/l/deadreckoning','_blank')">[ GET FULL VERSION — $2.99 ]</button>
+        <button class="unlock-btn" style="border-color:var(--green-dim);color:var(--green-dim);font-size:0.9em;margin-top:4px;" onclick="window.open('https://gumroad.com/l/darkcommute','_blank')">[ GET FULL VERSION — $2.99 ]</button>
         <button class="map-close" style="margin-top:8px;" onclick="hideLimitScreen()">[ CLOSE ]</button>
       </div>
     </div>
@@ -2033,12 +2034,14 @@ var gameState = {
 //  SYSTEM PROMPT  (v2.0 — 4 stats, win/lose)
 // ════════════════════════════════════════════
 function buildSystem() {
-  return `You are the narrator of DEAD RECKONING, a text adventure game.
+  return `You are the narrator of DARK COMMUTE, a text adventure game.
 
 == THE WORLD ==
-A massive solar flare struck Earth at 3:47am, triggering a global EMP.
+A massive solar flare struck Earth at 3:47am, triggering a total blackout.
 Every electronic device is dead. No phones, no cars, no power grid.
 The event happened 6 hours ago. Chaos is slowly building in the city.
+The player just needs to get home — a 15-mile commute that now feels
+like crossing a war zone.
 
 == THE PLAYER ==
 The player is ${character.name} — average city office worker. Zero survival training.
@@ -2113,7 +2116,7 @@ Rules:
 var bootLines = [
   { text: 'VECTREX PRO 9000 BIOS v2.31',          bright: true, delay: 0    },
   { text: 'MEMORY CHECK............. 640K OK',                  delay: 300  },
-  { text: 'DEAD RECKONING v1.0',                  bright: true, delay: 700  },
+  { text: 'DARK COMMUTE v1.0',                    bright: true, delay: 700  },
   { text: 'NARRATIVE AI MODULE: ONLINE',                        delay: 1100 },
   { text: 'STAT TRACKING: MORALE / HUNGER / THIRST / ENERGY',  delay: 1500 },
   { text: 'SAVE SYSTEM: localStorage INITIALIZED',              delay: 1900 },
@@ -2203,7 +2206,7 @@ function applyState() {
 
   // Footer
   document.getElementById('footerSector').textContent =
-    '\u2588 CITY SECTOR 7  |  EMP EVENT DAY ' + (gameState.day || 1);
+    '\u2588 DARK COMMUTE  |  BLACKOUT DAY ' + (gameState.day || 1);
 }
 
 function setStat(name, val) {
@@ -2371,7 +2374,7 @@ function runIntro(onComplete) {
   setTimeout(function() {
     if (introSkipped) return;
 
-    // ── Panel 2: EMP Event ──
+    // ── Panel 2: Blackout ──
     showIntroPanel('introP2');
     soundEMP();
 
@@ -3251,9 +3254,10 @@ var VALID_CODES = [
   'SURVIVOR2024',
   'ALEXRILEYCUSTOM',
   'EMPDAY1UNLOCK',
-  'DEADRECKONINGPRO',
+  'DARKCOMMUTEPRO',
   'FULLVERSIONGO',
-  'NORECKONING'
+  'NORECKONING',
+  'BADCOMMUTE'
   // Add more as needed when players donate
 ];
 
@@ -3403,7 +3407,7 @@ function tryUnlock() {
     addLine('<br><span style="color:var(--amber);letter-spacing:3px;">★ FULL VERSION UNLOCKED — Unlimited play activated. Thank you, Survivor. ★</span><br>', '');
     updateTurnCounter();
   } else {
-    errEl.textContent = '▸ Invalid code. Get yours at gumroad.com/l/deadreckoning';
+    errEl.textContent = '▸ Invalid code. Get yours at gumroad.com/l/darkcommute';
     soundDeath();
     input.value = '';
   }
@@ -3508,11 +3512,17 @@ var EASTER_EGGS = {
     reason: '↑↑↓↓←→←→ B A',
     sound: 'achievement'
   },
-  'dead reckoning': {
-    response: 'You say the name of the game you are currently inside. A strange recursive dizziness washes over you. Dead reckoning — navigation by estimating your position from a known point. Right now, your last known point is a warm bed. You have no idea where this ends.',
+  'dark commute': {
+    response: 'You say the name of the game you\'re in. The narrator shifts. Dark Commute — what started as just getting home. You\'re still 15 miles from your family. Keep moving.',
     points: 20,
     reason: 'Meta-awareness',
     sound: 'achievement'
+  },
+  'dead reckoning': {
+    response: 'The phrase hangs in the air. Navigating without instruments, from a last known position. That\'s exactly what you\'re doing out here. No phone. No GPS. Just instinct and a folded paper map.',
+    points: 15,
+    reason: 'Nautical awareness',
+    sound: 'response'
   },
   'survival quest': {
     response: 'You mutter the name of a different game entirely. Nothing happens. Though somewhere, Roger Wilco tips his mop in quiet solidarity.',
