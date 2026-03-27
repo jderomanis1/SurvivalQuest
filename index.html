@@ -1612,7 +1612,7 @@
       <!-- FOOTER -->
       <div class="screen-footer">
         <div class="footer-txt" id="footerSector">&#9608; CITY SECTOR 7 &nbsp;|&nbsp; EMP EVENT DAY 1</div>
-        <div class="footer-save" id="turnCounter" onclick="showLimitScreen()" title="Daily turns remaining" style="color:var(--green-dim);cursor:pointer;">&#9632; 20 LEFT</div>
+        <div class="footer-save" id="turnCounter" onclick="onTurnCounterClick()" title="Daily turns remaining" style="color:var(--green-dim);cursor:pointer;">&#9632; 20 LEFT</div>
         <div class="footer-save" onclick="clearSave()" title="Reset game">&#9673; RESET</div>
         <div class="footer-save" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#9834; SFX ON</div>
         <div class="footer-save" onclick="toggleMap()" title="Toggle map">&#9638; MAP</div>
@@ -1647,6 +1647,7 @@
           Get your unlock code at
           <span style="color:var(--amber);">ko-fi.com/survivalquest</span>
         </div>
+        <button class="map-close" style="margin-top:8px;" onclick="hideLimitScreen()">[ CLOSE ]</button>
       </div>
     </div>
 
@@ -3332,6 +3333,18 @@ function showLimitScreen() {
   if (isFullVersion) return;
   document.getElementById('limitScreen').style.display = 'flex';
   startLimitTimer();
+}
+
+// Clicking the counter: show info if turns remain, lock if out
+function onTurnCounterClick() {
+  if (isFullVersion) return;
+  if (isLimitReached()) {
+    showLimitScreen();
+  } else {
+    // Just show a quick status message in story
+    var left = turnsRemaining();
+    addLine('<span style="color:var(--green-dim);font-size:0.75em;">◾ ' + left + ' free turns remaining today. <span style="color:#444;">Unlock full version for unlimited play.</span></span><br>', '');
+  }
 }
 
 function hideLimitScreen() {
