@@ -1786,6 +1786,303 @@ function soundBoot() {
 }
 
 // ════════════════════════════════════════════
+//  AMBIENT SOUND ENGINE
+//  Continuous layered atmosphere per location
+// ════════════════════════════════════════════
+
+// Ambient state
+var ambientNodes   = [];   // all currently playing nodes
+var heartbeatTimer = null; // tension heartbeat interval
+var currentAmbient = null; // which location is playing
+
+// ── Brown noise generator ──────────────────
+// Brown noise = random static filtered to low frequencies
+// Sounds like city hum, wind, distant crowds
+function createBrownNoise(ctx) {
+  var bufferSize = ctx.sampleRate * 2; // 2 seconds of noise
+  var buffer     = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  var data       = buffer.getChannelData(0);
+  var lastOut    = 0;
+  for (var i = 0; i < bufferSize; i++) {
+    var white = Math.random() * 2 - 1;
+    data[i]   = (lastOut + (0.02 * white)) / 1.02;
+    lastOut   = data[i];
+    data[i]  *= 3.5; // amplify
+  }
+  var source      = ctx.createBufferSource();
+  source.buffer   = buffer;
+  source.loop     = true;
+  return source;
+}
+
+// ── Location ambient profiles ──────────────
+var AMBIENT_PROFILES = {
+  default: {
+    noiseVol:  0.02,
+    toneFreq:  60,
+    toneVol:   0.03,
+    label:     'silence'
+  },
+  bedroom: {
+    noiseVol:  0.015,
+    toneFreq:  55,
+    toneVol:   0.02,
+    extraFreq: 80,   // building creak
+    extraVol:  0.01,
+    label:     'bedroom silence'
+  },
+  kitchen: {
+    noiseVol:  0.025,
+    toneFreq:  65,
+    toneVol:   0.025,
+    extraFreq: 200,  // dripping tap
+    extraVol:  0.008,
+    label:     'kitchen drip'
+  },
+  bathroom: {
+    noiseVol:  0.02,
+    toneFreq:  70,
+    toneVol:   0.02,
+    label:     'bathroom echo'
+  },
+  living: {
+    noiseVol:  0.02,
+    toneFreq:  58,
+    toneVol:   0.02,
+    label:     'apartment quiet'
+  },
+  hallway: {
+    noiseVol:  0.04,
+    toneFreq:  75,
+    toneVol:   0.03,
+    extraFreq: 120,  // muffled voices
+    extraVol:  0.02,
+    label:     'muffled voices'
+  },
+  stairwell: {
+    noiseVol:  0.05,
+    toneFreq:  80,
+    toneVol:   0.035,
+    extraFreq: 160,
+    extraVol:  0.015,
+    label:     'echo stairwell'
+  },
+  street: {
+    noiseVol:  0.09,
+    toneFreq:  90,
+    toneVol:   0.05,
+    extraFreq: 140,  // distant crowd
+    extraVol:  0.04,
+    label:     'street chaos'
+  },
+  store: {
+    noiseVol:  0.06,
+    toneFreq:  85,
+    toneVol:   0.04,
+    extraFreq: 130,
+    extraVol:  0.025,
+    label:     'looted store'
+  },
+  park: {
+    noiseVol:  0.07,
+    toneFreq:  70,
+    toneVol:   0.03,
+    extraFreq: 110,  // wind through trees
+    extraVol:  0.03,
+    label:     'city park wind'
+  },
+  bridge: {
+    noiseVol:  0.12,
+    toneFreq:  100,
+    toneVol:   0.06,
+    extraFreq: 180,  // crowd panic + water
+    extraVol:  0.05,
+    label:     'bridge panic'
+  },
+  highway: {
+    noiseVol:  0.08,
+    toneFreq:  85,
+    toneVol:   0.04,
+    extraFreq: 150,
+    extraVol:  0.03,
+    label:     'open highway'
+  },
+  suburb: {
+    noiseVol:  0.03,
+    toneFreq:  60,
+    toneVol:   0.02,
+    label:     'quiet suburb'
+  }
+};
+
+// ── Start ambient for a location ──────────
+function startAmbient(locationStr) {
+  if (!audioEnabled) return;
+  var key     = getSceneKey(locationStr);
+  if (key === currentAmbient) return; // already playing
+  currentAmbient = key;
+
+  stopAmbient(); // stop previous
+
+  try {
+    var ctx     = getAudioCtx();
+    var profile = AMBIENT_PROFILES[key] || AMBIENT_PROFILES['default'];
+
+    // Master gain for this ambient scene
+    var masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0, ctx.currentTime);
+    masterGain.gain.linearRampToValueAtTime(1, ctx.currentTime + 2); // fade in
+    masterGain.connect(ctx.destination);
+
+    // Layer 1: Brown noise base
+    var noise     = createBrownNoise(ctx);
+    var noiseGain = ctx.createGain();
+    noiseGain.gain.value = profile.noiseVol;
+    var noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type            = 'lowpass';
+    noiseFilter.frequency.value = 400;
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(masterGain);
+    noise.start();
+    ambientNodes.push(noise, noiseGain, noiseFilter, masterGain);
+
+    // Layer 2: Low tone hum
+    if (profile.toneVol > 0) {
+      var tone     = ctx.createOscillator();
+      var toneGain = ctx.createGain();
+      tone.type            = 'sine';
+      tone.frequency.value = profile.toneFreq;
+      toneGain.gain.value  = profile.toneVol;
+      tone.connect(toneGain);
+      toneGain.connect(masterGain);
+      tone.start();
+      ambientNodes.push(tone, toneGain);
+    }
+
+    // Layer 3: Extra texture tone (optional)
+    if (profile.extraFreq && profile.extraVol > 0) {
+      var extra     = ctx.createOscillator();
+      var extraGain = ctx.createGain();
+      extra.type            = 'triangle';
+      extra.frequency.value = profile.extraFreq;
+      // Slowly modulate for organic feel
+      var lfo      = ctx.createOscillator();
+      var lfoGain  = ctx.createGain();
+      lfo.frequency.value  = 0.1 + Math.random() * 0.2;
+      lfoGain.gain.value   = profile.extraFreq * 0.05;
+      lfo.connect(lfoGain);
+      lfoGain.connect(extra.frequency);
+      extraGain.gain.value = profile.extraVol;
+      extra.connect(extraGain);
+      extraGain.connect(masterGain);
+      lfo.start();
+      extra.start();
+      ambientNodes.push(extra, extraGain, lfo, lfoGain);
+    }
+
+    // Store master gain so we can fade out
+    ambientNodes.push({ masterGain: masterGain });
+
+  } catch(e) {}
+}
+
+// ── Stop all ambient sounds ────────────────
+function stopAmbient() {
+  try {
+    ambientNodes.forEach(function(node) {
+      if (!node) return;
+      if (node.masterGain) {
+        // Fade out master gain
+        var g = node.masterGain;
+        g.gain.linearRampToValueAtTime(0, g.context.currentTime + 1.5);
+        return;
+      }
+      if (node.stop) {
+        try { node.stop(node.context ? node.context.currentTime + 1.5 : 0); } catch(e) {}
+      }
+    });
+    // Clear after fade
+    setTimeout(function() { ambientNodes = []; }, 1600);
+  } catch(e) { ambientNodes = []; }
+  currentAmbient = null;
+}
+
+// ── Tension heartbeat ──────────────────────
+// Plays when any stat is critically low
+function startHeartbeat() {
+  if (heartbeatTimer) return; // already running
+  var bpm = 80;
+
+  heartbeatTimer = setInterval(function() {
+    if (!audioEnabled) return;
+    // Check lowest stat
+    var minStat = Math.min(
+      gameState.morale || 100,
+      gameState.hunger  || 100,
+      gameState.thirst  || 100,
+      gameState.energy  || 100
+    );
+
+    if (minStat > 35) {
+      stopHeartbeat();
+      return;
+    }
+
+    // Speed up heartbeat as stats drop
+    bpm = Math.round(60 + ((35 - minStat) / 35) * 80);
+
+    // Two-beat heartbeat (lub-dub)
+    beep('sine', 60, 0.08, 0.15);
+    setTimeout(function() {
+      beep('sine', 55, 0.1, 0.12);
+    }, 150);
+
+    // Reschedule at new BPM
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+    setTimeout(startHeartbeat, (60000 / bpm));
+
+  }, 60000 / bpm);
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+// ── Check if heartbeat needed after state update ──
+function checkTensionAudio() {
+  var minStat = Math.min(
+    gameState.morale || 100,
+    gameState.hunger  || 100,
+    gameState.thirst  || 100,
+    gameState.energy  || 100
+  );
+  if (minStat <= 35 && !heartbeatTimer) {
+    startHeartbeat();
+  } else if (minStat > 35) {
+    stopHeartbeat();
+  }
+}
+
+// ── Toggle ambient with mute ───────────────
+// Override toggleMute to also handle ambient
+function toggleMute() {
+  audioEnabled = !audioEnabled;
+  document.getElementById('muteBtn').textContent =
+    audioEnabled ? '♪ SFX ON' : '♪ SFX OFF';
+  if (!audioEnabled) {
+    stopAmbient();
+    stopHeartbeat();
+  } else {
+    startAmbient(gameState.location);
+  }
+}
+
+// ════════════════════════════════════════════
 //  CHARACTER
 // ════════════════════════════════════════════
 var character = {
@@ -1809,6 +2106,7 @@ function selectChar(name, subject, object, possessive) {
   applyState();
   setSceneByLocation(gameState.location);
   updateHintButtons(gameState.location);
+  startAmbient(gameState.location);
   document.getElementById('cmdInput').focus();
 }
 
@@ -3122,6 +3420,7 @@ function applyParsed(p) {
     setSceneByLocation(p.location);
     updateHintButtons(p.location);
     markVisited(p.location);
+    startAmbient(p.location);
   }
   if (p.morale  !== null) gameState.morale  = p.morale;
   if (p.hunger  !== null) gameState.hunger  = p.hunger;
@@ -3146,6 +3445,7 @@ function applyParsed(p) {
   }
 
   applyState();
+  checkTensionAudio();
 }
 
 // ════════════════════════════════════════════
@@ -3722,11 +4022,6 @@ function sendCommand() {
   }));
 }
 
-function toggleMute() {
-  audioEnabled = !audioEnabled;
-  document.getElementById('muteBtn').textContent = audioEnabled ? '♪ SFX ON' : '♪ SFX OFF';
-}
-
 // ════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════
@@ -3749,6 +4044,8 @@ window.onload = function() {
     document.getElementById('gameScreen').style.display  = 'block';
     setSceneByLocation(gameState.location);
     updateHintButtons(gameState.location);
+    startAmbient(gameState.location);
+    checkTensionAudio();
     var helpEl = document.getElementById('helpCharName');
     if (helpEl) helpEl.textContent = character.name;
     document.getElementById('cmdInput').focus();
