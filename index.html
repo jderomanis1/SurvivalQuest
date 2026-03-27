@@ -644,8 +644,161 @@
     }
 
     /* ═══════════════════════════════
-       DAY MILESTONE BANNER
+       MAP OVERLAY
     ═══════════════════════════════ */
+    #mapOverlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,5,0,0.97);
+      z-index: 45;
+      padding: 16px;
+      flex-direction: column;
+      gap: 12px;
+      animation: mapSlideIn 0.3s ease forwards;
+    }
+
+    @keyframes mapSlideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .map-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--green-dim);
+      padding-bottom: 8px;
+    }
+
+    .map-title {
+      font-family: 'VT323', monospace;
+      color: var(--amber);
+      font-size: 1.2em;
+      letter-spacing: 3px;
+      text-shadow: 0 0 10px var(--amber);
+    }
+
+    .map-close {
+      background: transparent;
+      border: 1px solid var(--green-dim);
+      color: var(--green);
+      font-family: 'VT323', monospace;
+      font-size: 1em;
+      padding: 2px 12px;
+      cursor: pointer;
+      letter-spacing: 2px;
+    }
+
+    .map-close:hover { background: var(--green); color: #000; }
+
+    .map-legend {
+      display: flex;
+      gap: 14px;
+      font-size: 0.6em;
+      letter-spacing: 1px;
+    }
+
+    .leg-current { color: var(--green); }
+    .leg-visited  { color: var(--green-dim); }
+    .leg-unknown  { color: #1a3a1a; }
+
+    .map-grid {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      justify-content: center;
+    }
+
+    .map-row {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+    }
+
+    .map-cell {
+      width: 52px;
+      height: 36px;
+      border: 1px solid #0d200d;
+      background: #000800;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.55em;
+      letter-spacing: 0.5px;
+      color: #1a3a1a;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .map-cell.unknown {
+      color: #1a3a1a;
+      border-color: #0d200d;
+    }
+
+    .map-cell.visited {
+      color: var(--green-dim);
+      border-color: var(--green-dim);
+      background: #001200;
+    }
+
+    .map-cell.current {
+      color: var(--green);
+      border-color: var(--green);
+      background: #002200;
+      box-shadow: 0 0 10px var(--green-glow),
+                  inset 0 0 8px var(--green-glow);
+      animation: cellPulse 1.5s infinite;
+    }
+
+    .map-cell.empty {
+      border: none;
+      background: transparent;
+    }
+
+    .map-cell.connector {
+      border: none;
+      background: transparent;
+      color: #1a3a1a;
+      font-size: 0.7em;
+    }
+
+    .map-cell.connector.visited { color: var(--green-dim); }
+    .map-cell.connector.current { color: var(--green); }
+
+    .cell-code {
+      font-family: 'VT323', monospace;
+      font-size: 1.3em;
+      line-height: 1;
+    }
+
+    .cell-name {
+      font-size: 0.75em;
+      letter-spacing: 0.3px;
+      opacity: 0.8;
+    }
+
+    @keyframes cellPulse {
+      0%,100% { box-shadow: 0 0 10px var(--green-glow), inset 0 0 8px var(--green-glow); }
+      50%      { box-shadow: 0 0 18px var(--green),     inset 0 0 12px var(--green-glow); }
+    }
+
+    .map-footer {
+      text-align: center;
+      font-size: 0.55em;
+      color: #1a3a1a;
+      letter-spacing: 2px;
+      font-style: italic;
+      border-top: 1px solid #0d200d;
+      padding-top: 8px;
+    }
+
+    @media (max-width: 520px) {
+      .map-cell { width: 44px; height: 32px; }
+      .map-title { font-size: 1em; letter-spacing: 2px; }
+    }
     #dayBanner {
       display: none;
       position: absolute;
@@ -800,6 +953,23 @@
     <div id="dayBanner">
       <span class="banner-day" id="bannerDay">DAY 2</span>
       <span class="banner-msg" id="bannerMsg">The city is waking up to reality.</span>
+    </div>
+
+    <!-- MAP OVERLAY -->
+    <div id="mapOverlay">
+      <div class="map-header">
+        <div class="map-title">&#9638; CITY SECTOR 7 — AREA MAP</div>
+        <button class="map-close" onclick="toggleMap()">[ CLOSE ]</button>
+      </div>
+      <div class="map-legend">
+        <span class="leg-current">&#9608; CURRENT</span>
+        <span class="leg-visited">&#9617; VISITED</span>
+        <span class="leg-unknown">&#9618; UNKNOWN</span>
+      </div>
+      <div class="map-grid" id="mapGrid">
+        <!-- injected by JS -->
+      </div>
+      <div class="map-footer">PAPER MAP — HAND DRAWN — PROBABLY WRONG</div>
     </div>
 
     <!-- BOOT SCREEN -->
@@ -1000,6 +1170,7 @@
         <div class="footer-txt" id="footerSector">&#9608; CITY SECTOR 7 &nbsp;|&nbsp; EMP EVENT DAY 1</div>
         <div class="footer-save" onclick="clearSave()" title="Reset game">&#9673; RESET</div>
         <div class="footer-save" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#9834; SFX ON</div>
+        <div class="footer-save" onclick="toggleMap()" title="Toggle map">&#9638; MAP</div>
       </div>
     </div>
 
@@ -1610,6 +1781,164 @@ function renderInventoryGrid(inv) {
 }
 
 // ════════════════════════════════════════════
+//  MAP SYSTEM
+// ════════════════════════════════════════════
+
+// The world laid out as a 2D grid.
+// Each cell: { code, name, key } or null for empty space
+// 'key' matches the keys in SCENES and LOCATION_HINTS
+var MAP_GRID = [
+  [
+    { code: 'BTH', name: 'BATH',    key: 'bathroom' },
+    { code: 'BED', name: 'BEDROOM', key: 'bedroom'  },
+    { code: 'LVG', name: 'LIVING',  key: 'living'   }
+  ],
+  [
+    null,
+    { code: 'HALL', name: 'HALLWAY', key: 'hallway' },
+    null
+  ],
+  [
+    null,
+    { code: 'STRS', name: 'STAIRS',  key: 'stairwell' },
+    null
+  ],
+  [
+    { code: 'STOR', name: 'STORE',  key: 'store' },
+    { code: 'STRT', name: 'STREET', key: 'street' },
+    { code: 'PARK', name: 'PARK',   key: 'park'  }
+  ],
+  [
+    null,
+    { code: 'BRDG', name: 'BRIDGE', key: 'bridge' },
+    null
+  ],
+  [
+    null,
+    { code: 'HWAY', name: 'HWY',    key: 'highway' },
+    null
+  ],
+  [
+    null,
+    { code: 'SUBR', name: 'SUBURB', key: 'suburb' },
+    null
+  ]
+];
+
+// Track which location keys the player has visited
+// Stored as an array in localStorage, converted to Set in memory
+var visitedLocations = new Set(['bedroom']); // start revealed
+
+function saveVisited() {
+  try {
+    localStorage.setItem('sq_visited', JSON.stringify([...visitedLocations]));
+  } catch(e) {}
+}
+
+function loadVisited() {
+  try {
+    var v = localStorage.getItem('sq_visited');
+    if (v) visitedLocations = new Set(JSON.parse(v));
+  } catch(e) {}
+}
+
+function markVisited(locationStr) {
+  var key = getSceneKey(locationStr);
+  if (key && key !== 'default') {
+    visitedLocations.add(key);
+    saveVisited();
+  }
+}
+
+function renderMap() {
+  var grid       = document.getElementById('mapGrid');
+  var currentKey = getSceneKey(gameState.location);
+  if (!grid) return;
+
+  grid.innerHTML = '';
+
+  MAP_GRID.forEach(function(row, rowIdx) {
+    var rowEl = document.createElement('div');
+    rowEl.className = 'map-row';
+
+    row.forEach(function(cell) {
+      var cellEl = document.createElement('div');
+
+      if (!cell) {
+        // Empty spacer cell
+        cellEl.className = 'map-cell empty';
+      } else {
+        var isCurrent = (cell.key === currentKey);
+        var isVisited = visitedLocations.has(cell.key);
+
+        cellEl.className = 'map-cell ' +
+          (isCurrent ? 'current' : isVisited ? 'visited' : 'unknown');
+
+        var codeEl = document.createElement('div');
+        codeEl.className   = 'cell-code';
+        codeEl.textContent = isCurrent ? cell.code : (isVisited ? cell.code : '???');
+
+        var nameEl = document.createElement('div');
+        nameEl.className   = 'cell-name';
+        nameEl.textContent = isCurrent ? cell.name : (isVisited ? cell.name : '');
+
+        cellEl.appendChild(codeEl);
+        cellEl.appendChild(nameEl);
+
+        // Tooltip always shows full name
+        cellEl.title = cell.name;
+      }
+
+      rowEl.appendChild(cellEl);
+    });
+
+    grid.appendChild(rowEl);
+
+    // Add a connector row between location rows (shows path direction)
+    if (rowIdx < MAP_GRID.length - 1) {
+      var connRow = document.createElement('div');
+      connRow.className = 'map-row';
+
+      row.forEach(function(cell) {
+        var conn = document.createElement('div');
+        // Only draw connector under the middle column (index 1)
+        var centerCells = [
+          MAP_GRID[rowIdx][1],
+          MAP_GRID[rowIdx + 1] ? MAP_GRID[rowIdx + 1][1] : null
+        ];
+
+        if (cell && cell === MAP_GRID[rowIdx][1] && centerCells[1]) {
+          conn.className = 'map-cell connector' +
+            (visitedLocations.has(cell.key) ? ' visited' : '');
+          conn.textContent = '|';
+        } else {
+          conn.className = 'map-cell empty';
+        }
+        connRow.appendChild(conn);
+      });
+
+      grid.appendChild(connRow);
+    }
+  });
+}
+
+var mapOpen = false;
+
+function toggleMap() {
+  soundQuickBtn();
+  var overlay = document.getElementById('mapOverlay');
+  mapOpen = !mapOpen;
+
+  if (mapOpen) {
+    markVisited(gameState.location); // ensure current shown
+    renderMap();
+    overlay.style.display = 'flex';
+  } else {
+    overlay.style.display = 'none';
+  }
+}
+
+// ════════════════════════════════════════════
 //  DYNAMIC HINT BUTTONS
 // ════════════════════════════════════════════
 
@@ -1835,6 +2164,7 @@ function applyParsed(p) {
     gameState.location = p.location;
     setSceneByLocation(p.location);
     updateHintButtons(p.location);
+    markVisited(p.location);
   }
   if (p.morale  !== null) gameState.morale  = p.morale;
   if (p.hunger  !== null) gameState.hunger  = p.hunger;
@@ -2083,6 +2413,7 @@ window.onload = function() {
     } catch(e) {}
 
     var loaded = loadGame();
+    loadVisited();
 
     if (loaded) {
       // Returning player — skip char select, go straight to game
