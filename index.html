@@ -1950,6 +1950,8 @@ Rules:
 - INVENTORY must list ALL items Alex currently has. Maximum 6 items — if full, player must drop something before taking more.
 - If player tries to take a 7th item, respond in-character that their hands/pockets are full.
 - Award POINTS (10-50) for clever solutions, creative thinking, helping NPCs, finding secrets. Award 0 for routine actions. Max game score is 500.
+- HIDDEN SECRETS: If the player examines the emergency kit coupon (Bed Bath & Beyond 2019), reads junk mail, checks under the bed, looks in coat pockets, or tries to use the microwave — reward them with +15-25 bonus points and something funny/useful they find.
+- If the player tries something genuinely absurd and creative, reward them generously with points and a witty response.
 - If input is gibberish, respond in-character: "That's not something you can do right now, ${character.name}."`;
 }
 
@@ -3084,6 +3086,148 @@ function setQuickActionsDisabled(disabled) {
 }
 
 // ════════════════════════════════════════════
+//  EASTER EGG SYSTEM
+// ════════════════════════════════════════════
+
+var EASTER_EGGS = {
+  'xyzzy': {
+    response: 'A hollow voice says "Plugh." Nothing happens. But you feel strangely nostalgic.',
+    points: 15,
+    reason: 'Classic adventurer!',
+    sound: 'response'
+  },
+  'hello claude': {
+    response: 'The AI powering this narrative clears its throat awkwardly. "I\'m just the narrator," it says. "Pay no attention to the large language model behind the curtain."',
+    points: 25,
+    reason: 'Found the narrator',
+    sound: 'achievement'
+  },
+  'what year is it': {
+    response: 'Your phone is dead. Your clock is frozen at 3:47 AM. Your calendar app is gone. For all you know, it could be any year. Time has become deeply theoretical.',
+    points: 10,
+    reason: 'Philosophical inquiry',
+    sound: 'response'
+  },
+  'sudo survive': {
+    response: 'sudo: survive: command not found. Also, all computers are dead. Including the one running sudo. You are the computer now.',
+    points: 20,
+    reason: 'Developer instincts',
+    sound: 'response'
+  },
+  '42': {
+    response: 'You contemplate the answer to life, the universe, and everything. It doesn\'t help you find water. But for a moment, the silence feels almost meaningful.',
+    points: 15,
+    reason: 'Hitchhiker found',
+    sound: 'response'
+  },
+  'help computer': {
+    response: 'The computer is dead. All computers are dead. This is not the Enterprise. There is no computer. You are distressingly alone.',
+    points: 15,
+    reason: 'Star Trek fan',
+    sound: 'response'
+  },
+  'order pizza': {
+    response: 'You try to remember the pizza place\'s number. Then remember your phone is dead. Then remember the delivery guy\'s car won\'t start. Then remember civilization has collapsed. You are very hungry.',
+    points: 20,
+    reason: 'Optimistic thinking',
+    sound: 'response'
+  },
+  'call 911': {
+    response: 'You pick up the dead phone and stare at it. The irony of needing emergency services when the entire emergency service infrastructure has simultaneously failed is not lost on you.',
+    points: 10,
+    reason: 'Tried the obvious',
+    sound: 'response'
+  },
+  'turn on tv': {
+    response: 'The TV stares back at you — a black mirror reflecting a disheveled person who really should have bought that emergency kit they kept seeing on late-night infomercials.',
+    points: 10,
+    reason: 'Checked the news',
+    sound: 'response'
+  },
+  'rogerskaer': {
+    response: 'The names of the two Space Quest creators echo through the empty apartment. Somewhere, Ken Williams smiles. Roger Wilco would know what to do here. You are not Roger Wilco.',
+    points: 30,
+    reason: 'Sierra On-Line tribute!',
+    sound: 'achievement'
+  },
+  'look at hands': {
+    response: 'Two hands. Ten fingers. No calluses — office worker hands. You\'ve typed thousands of emails with these. Today they\'ll need to do something more useful.',
+    points: 10,
+    reason: 'Self-reflection',
+    sound: 'response'
+  },
+  'scream': {
+    response: 'You open your mouth. A sound comes out. Somewhere in 6B, Mrs Chen knocks on the wall. From 6D: "Dude, same." The silence after feels heavier than before.',
+    points: 15,
+    reason: 'Understandable',
+    sound: 'response'
+  },
+  'dance': {
+    response: 'You attempt a brief, performative shimmy in the dark kitchen. Nobody sees it. It doesn\'t help. But morale increases by exactly one percent through sheer absurdity.',
+    points: 10,
+    reason: 'Morale technique',
+    sound: 'response'
+  },
+  'konami': {
+    response: 'Up up down down left right left right... nothing happens. The cheat codes for real life have always been: water, food, shelter, and someone to trust.',
+    points: 25,
+    reason: '↑↑↓↓←→←→ B A',
+    sound: 'achievement'
+  },
+  'survival quest': {
+    response: 'You say the name of the game you are currently in. A strange recursive dizziness washes over you. The narrator shifts uncomfortably. Let\'s not do that again.',
+    points: 20,
+    reason: 'Meta-awareness',
+    sound: 'achievement'
+  }
+};
+
+// Check if command matches an easter egg (fuzzy match)
+function checkEasterEgg(cmd) {
+  var lower = cmd.toLowerCase().trim();
+
+  // Exact match first
+  if (EASTER_EGGS[lower]) return EASTER_EGGS[lower];
+
+  // Partial match — command contains the trigger
+  for (var key in EASTER_EGGS) {
+    if (lower.indexOf(key) !== -1 || key.indexOf(lower) !== -1) {
+      if (lower.length >= 3 && key.length >= 3) { // avoid tiny false matches
+        return EASTER_EGGS[key];
+      }
+    }
+  }
+  return null;
+}
+
+function triggerEasterEgg(cmd, egg) {
+  // Show the command
+  addLine('&gt; ' + cmd + '<br>', 't-player');
+
+  // Short delay for drama
+  setTimeout(function() {
+    addLine(egg.response + '<br><span class="cursor"></span>', 't-narrator');
+
+    // Award points
+    if (egg.points) {
+      awardPoints(egg.points, egg.reason, 'egg_' + cmd.toLowerCase().replace(/\s/g,'_'));
+    }
+
+    // Play sound
+    if (egg.sound === 'achievement') soundAchievement();
+    else soundResponse();
+
+    // Re-enable input
+    var input = document.getElementById('cmdInput');
+    var goBtn = document.getElementById('goBtn');
+    input.disabled = false;
+    goBtn.disabled = false;
+    setQuickActionsDisabled(false);
+    input.focus();
+  }, 400);
+}
+
+// ════════════════════════════════════════════
 //  SEND COMMAND TO CLAUDE
 // ════════════════════════════════════════════
 function sendCommand() {
@@ -3100,6 +3244,13 @@ function sendCommand() {
 
   removeCursor();
   addLine('<br>', '');
+
+  // ── Easter egg intercept — before hitting Claude API ──
+  var egg = checkEasterEgg(val);
+  if (egg) {
+    triggerEasterEgg(val, egg);
+    return; // stop here, don't call Claude
+  }
   addLine('&gt; ' + val + '<br>', 't-player');
 
   // Animated waiting dots
