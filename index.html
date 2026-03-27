@@ -267,7 +267,7 @@
       letter-spacing: 2px;
     }
 
-    .day-sub { color: #888; font-size: 0.62em; letter-spacing: 1px; margin-top: 2px; }
+    .day-sub { color: #aaa; font-size: 0.65em; letter-spacing: 1px; margin-top: 2px; }
 
     /* ═══════════════════════════════
        QUICK ACTIONS
@@ -1037,6 +1037,10 @@
       cursor: pointer;
     }
 
+    /* Black pause before intro starts */
+    #introScreen.intro-black { background: #000; }
+    #introScreen.intro-black * { opacity: 0; }
+
     .intro-panel {
       position: absolute;
       inset: 0;
@@ -1202,15 +1206,15 @@
       position: absolute;
       bottom: 14px;
       right: 16px;
-      font-size: 0.55em;
-      color: #666;
-      letter-spacing: 1px;
+      font-size: 0.62em;
+      color: #999;
+      letter-spacing: 2px;
       animation: skipPulse 2s ease-in-out infinite;
     }
 
     @keyframes skipPulse {
       0%,100% { opacity: 0.5; }
-      50%      { opacity: 1; }
+      50%      { opacity: 1.0; }
     }
 
     @media (max-width: 520px) {
@@ -1221,32 +1225,31 @@
     #achievementPopup {
       display: none;
       position: fixed;
-      bottom: 24px;
-      right: 24px;
+      bottom: 80px;
+      right: 16px;
       z-index: 999;
+      max-width: 240px;
       animation: achSlideIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
     }
 
     .ach-inner {
-      background: #000a00;
+      background: #000d00;
       border: 1px solid var(--amber);
-      box-shadow: 0 0 24px rgba(255,176,0,0.3), 0 4px 20px rgba(0,0,0,0.8);
-      padding: 14px 18px;
-      min-width: 200px;
-      max-width: 260px;
+      box-shadow: 0 0 24px rgba(255,176,0,0.25), 0 4px 20px rgba(0,0,0,0.9);
+      padding: 12px 16px;
       text-align: center;
     }
 
     .ach-header {
-      font-size: 0.55em;
+      font-size: 0.6em;
       color: var(--amber);
       letter-spacing: 2px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       border-bottom: 1px solid #996800;
-      padding-bottom: 6px;
+      padding-bottom: 5px;
     }
 
-    .ach-icon { font-size: 2em; margin: 6px 0; }
+    .ach-icon { font-size: 1.8em; margin: 4px 0; }
 
     .ach-name {
       font-family: 'VT323', monospace;
@@ -1259,24 +1262,33 @@
 
     .ach-desc {
       color: var(--green-dim);
-      font-size: 0.6em;
+      font-size: 0.65em;
       letter-spacing: 1px;
       line-height: 1.5;
     }
 
     @keyframes achSlideIn {
-      from { opacity: 0; transform: translateX(60px) scale(0.8); }
+      from { opacity: 0; transform: translateX(40px) scale(0.9); }
       to   { opacity: 1; transform: translateX(0)    scale(1);   }
     }
 
     @keyframes achSlideOut {
       from { opacity: 1; transform: translateX(0)    scale(1);   }
-      to   { opacity: 0; transform: translateX(60px) scale(0.8); }
+      to   { opacity: 0; transform: translateX(40px) scale(0.9); }
     }
 
     @media (max-width: 520px) {
-      #achievementPopup { bottom: 12px; right: 8px; left: 8px; }
-      .ach-inner { max-width: 100%; }
+      #achievementPopup {
+        bottom: auto;
+        top: 60px;
+        right: 8px;
+        left: 8px;
+        max-width: 100%;
+      }
+      @keyframes achSlideIn {
+        from { opacity: 0; transform: translateY(-20px) scale(0.9); }
+        to   { opacity: 1; transform: translateY(0)     scale(1);   }
+      }
     }
 
     #dayBanner {
@@ -1402,7 +1414,7 @@
     <div class="screen-header">
       <div class="game-title">&#9733; DARK COMMUTE &#9733;</div>
       <div class="header-badges">
-        <div class="badge" id="scoreBadge" style="color:var(--amber);border-color:var(--amber-dim);">0 PTS</div>
+        <div class="badge" id="scoreBadge" style="color:var(--amber);border-color:var(--amber-dim);display:none;">0 PTS</div>
         <div class="badge live">&#9679; LIVE</div>
         <div class="badge" id="versionBadge">v1.0</div>
       </div>
@@ -2213,6 +2225,9 @@ function selectChar(name, subject, object, possessive) {
   if (el) el.textContent = name;
   document.getElementById('charScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'block';
+  // Show score badge now that game has started
+  var sb = document.getElementById('scoreBadge');
+  if (sb) sb.style.display = '';
   applyState();
   setSceneByLocation(gameState.location);
   updateHintButtons(gameState.location);
@@ -2778,40 +2793,50 @@ function runIntro(onComplete) {
     finishIntro(onComplete);
   };
 
-  // ── Panel 1: Silence ──
-  showIntroPanel('introP1');
+  // Hide all panels — pure black pause for 800ms
+  ['introP1','introP2','introP3','introP4'].forEach(function(p) {
+    var el = document.getElementById(p);
+    if (el) el.style.display = 'none';
+  });
 
   setTimeout(function() {
     if (introSkipped) return;
-
-    // ── Panel 2: Blackout ──
-    showIntroPanel('introP2');
-    soundEMP();
+    // ── Panel 1: Silence ──
+    showIntroPanel('introP1');
 
     setTimeout(function() {
       if (introSkipped) return;
 
-      // ── Panel 3: City Goes Dark ──
-      showIntroPanel('introP3');
-      buildCityScape();
-      soundCityDark();
-      setTimeout(flickerCityLights, 400);
+      // ── Panel 2: Blackout ──
+      showIntroPanel('introP2');
+      soundEMP();
 
       setTimeout(function() {
         if (introSkipped) return;
 
-        // ── Panel 4: Title Card ──
-        showIntroPanel('introP4');
-        soundTitleSlam();
+        // ── Panel 3: City Goes Dark ──
+        showIntroPanel('introP3');
+        buildCityScape();
+        soundCityDark();
+        setTimeout(flickerCityLights, 400);
 
         setTimeout(function() {
           if (introSkipped) return;
-          finishIntro(onComplete);
-        }, 3500);
 
-      }, 3000); // panel 3 duration
-    }, 3000);   // panel 2 duration
-  }, 2500);     // panel 1 duration
+          // ── Panel 4: Title Card ──
+          showIntroPanel('introP4');
+          soundTitleSlam();
+
+          setTimeout(function() {
+            if (introSkipped) return;
+            finishIntro(onComplete);
+          }, 3500);
+
+        }, 3000); // panel 3 duration
+      }, 3000);   // panel 2 duration
+    }, 2500);     // panel 1 duration
+
+  }, 800); // black pause before intro
 }
 
 function finishIntro(onComplete) {
@@ -4441,6 +4466,8 @@ window.onload = function() {
     // Returning player — skip intro and boot, go straight to game
     document.getElementById('introScreen').style.display = 'none';
     document.getElementById('gameScreen').style.display  = 'block';
+    var sb = document.getElementById('scoreBadge');
+    if (sb) sb.style.display = '';
     setSceneByLocation(gameState.location);
     updateHintButtons(gameState.location);
     startAmbient(gameState.location);
