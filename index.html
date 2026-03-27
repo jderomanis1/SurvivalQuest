@@ -529,6 +529,27 @@
     .t-wait     { color: var(--green-dim); font-style: italic; }
     .t-system   { color: #777; font-size: 0.8em; letter-spacing: 1px; }
     .t-hint     { color: #4a8a4a; font-size: 0.75em; font-style: italic; }
+    .t-tutorial {
+      color: #3a6a3a;
+      font-size: 0.72em;
+      font-style: italic;
+      letter-spacing: 0.5px;
+      line-height: 1.6;
+      display: block;
+      border-left: 2px solid #2a4a2a;
+      padding-left: 8px;
+      animation: tutorialFade 1s ease 1s both;
+    }
+    .t-tutorial-cmd {
+      color: var(--green-dim);
+      font-style: normal;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    @keyframes tutorialFade {
+      from { opacity: 0; transform: translateX(-4px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
 
     .cursor {
       display: inline-block; width: 9px; height: 1em;
@@ -1585,7 +1606,7 @@
             distant traffic. Just a silence so complete it has a
             weight to it.<br><br>
             Something has happened.<br><br>
-            <span class="t-hint">[ Type a command below or tap a quick action ]</span><br><br>
+            <span id="tutorialHint1" class="t-tutorial">&#9655; Start by getting your bearings. Try: <span class="t-tutorial-cmd">LOOK AROUND</span></span><br><br>
             <span class="cursor"></span>
           </div>
         </div>
@@ -2174,6 +2195,7 @@ function selectChar(name, subject, object, possessive) {
   updateHintButtons(gameState.location);
   startAmbient(gameState.location);
   updatePortrait();
+  initTutorial();
   document.getElementById('cmdInput').focus();
 }
 
@@ -3609,6 +3631,115 @@ function setQuickActionsDisabled(disabled) {
 }
 
 // ════════════════════════════════════════════
+//  TUTORIAL SYSTEM
+//  Gentle first-3-turns guidance
+//  Only shows for new players, never returning
+// ════════════════════════════════════════════
+
+var tutorialStep = 0;      // 0=not started, 1,2,3=in progress, 4=done
+var tutorialActive = true; // disabled for returning players
+
+var TUTORIAL_HINTS = {
+  2: {
+    // After turn 1 (first look around)
+    text: '&#9655; Notice anything nearby? You can <span class="t-tutorial-cmd">TAKE</span> items you find.',
+    condition: function(parsed) {
+      // Show after any look/examine command
+      return true;
+    }
+  },
+  3: {
+    // After turn 2 (after taking something or exploring)
+    text: '&#9655; Good instinct. Other rooms hold more supplies. The kitchen and hallway are worth checking.',
+    condition: function(parsed) {
+      // Show after inventory has something OR they moved
+      var hasItem = (gameState.inventory || []).length > 0;
+      var moved   = getSceneKey(parsed.location || '') !== 'bedroom';
+      return hasItem || moved;
+    }
+  }
+};
+
+function initTutorial() {
+  // Check if player has played before
+  try {
+    var played = localStorage.getItem('sq_tutorial_done');
+    if (played === 'true') {
+      tutorialActive = false;
+      tutorialStep   = 4;
+      // Hide hint1 since they're a returning player
+      var h = document.getElementById('tutorialHint1');
+      if (h) h.style.display = 'none';
+      return;
+    }
+  } catch(e) {}
+  tutorialStep   = 1;
+  tutorialActive = true;
+}
+
+function completeTutorial() {
+  tutorialActive = false;
+  tutorialStep   = 4;
+  try { localStorage.setItem('sq_tutorial_done', 'true'); } catch(e) {}
+}
+
+function checkTutorial(parsed) {
+  if (!tutorialActive || tutorialStep >= 4) return;
+
+  tutorialStep++;
+
+  // Remove the previous hint
+  var prev = document.getElementById('tutorialHint' + (tutorialStep - 1));
+  if (prev) {
+    prev.style.transition = 'opacity 0.5s ease';
+    prev.style.opacity    = '0';
+    setTimeout(function() { if (prev) prev.remove(); }, 500);
+  }
+
+  // Show next hint if we have one
+  var hint = TUTORIAL_HINTS[tutorialStep];
+  if (hint) {
+    setTimeout(function() {
+      var span       = document.createElement('span');
+      span.id        = 'tutorialHint' + tutorialStep;
+      span.className = 't-tutorial';
+      span.innerHTML = hint.text;
+
+      var story = document.getElementById('story');
+      // Insert before the final cursor
+      var cursor = story.querySelector('.cursor');
+      if (cursor && cursor.parentNode) {
+        story.insertBefore(span, cursor.parentNode);
+        story.insertBefore(document.createElement('br'), cursor.parentNode);
+      } else {
+        story.appendChild(span);
+      }
+      story.scrollTop = story.scrollHeight;
+    }, 800); // slight delay after narrative lands
+  }
+
+  // Complete tutorial after step 3
+  if (tutorialStep >= 3) {
+    setTimeout(function() {
+      completeTutorial();
+      // Final farewell from the tutorial
+      setTimeout(function() {
+        addLine('<span class="t-tutorial">&#9655; You\'ve got this. The city is waiting. No more hints — just you and the commute.</span><br>', '');
+        // Fade it out after 4 seconds
+        setTimeout(function() {
+          var hints = document.querySelectorAll('.t-tutorial');
+          hints.forEach(function(h) {
+            h.style.transition = 'opacity 1s ease';
+            h.style.opacity    = '0';
+            setTimeout(function() { h.remove(); }, 1000);
+          });
+        }, 4000);
+      }, 1000);
+    }, 500);
+  }
+}
+
+// ════════════════════════════════════════════
 //  CHARACTER PORTRAIT SYSTEM
 // ════════════════════════════════════════════
 
@@ -4199,6 +4330,7 @@ function sendCommand() {
         incrementTurns();
         checkAchievements(parsed);
         handleClaudePoints(parsed);
+        checkTutorial(parsed);
         if (parsed.day && parsed.day > (gameState.day || 1)) checkDayPoints(parsed.day);
         if (!checkGameOver(parsed)) {
           addLine(parsed.narration + '<br><span class="cursor"></span>', 't-narrator');
@@ -4264,6 +4396,7 @@ window.onload = function() {
     startAmbient(gameState.location);
     checkTensionAudio();
     updatePortrait();
+    initTutorial(); // will disable itself for returning players
     var helpEl = document.getElementById('helpCharName');
     if (helpEl) helpEl.textContent = character.name;
     document.getElementById('cmdInput').focus();
