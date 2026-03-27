@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SURVIVAL QUEST</title>
+  <title>DEAD RECKONING</title>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -1314,13 +1314,13 @@
 <body>
 
 <div class="monitor">
-  <div class="monitor-brand">VECTREX PRO 9000 &nbsp;&#9632;&nbsp; COLOR MONITOR</div>
+  <div class="monitor-brand">VECTREX PRO 9000 &nbsp;&#9632;&nbsp; DEAD RECKONING TERMINAL</div>
 
   <div class="crt" style="position:relative;">
 
     <!-- HEADER -->
     <div class="screen-header">
-      <div class="game-title">&#9733; SURVIVAL QUEST &#9733;</div>
+      <div class="game-title">&#9733; DEAD RECKONING &#9733;</div>
       <div class="header-badges">
         <div class="badge" id="scoreBadge" style="color:var(--amber);border-color:var(--amber-dim);">0 PTS</div>
         <div class="badge live">&#9679; LIVE</div>
@@ -1406,9 +1406,9 @@
       <!-- PANEL 4: Title Card -->
       <div class="intro-panel" id="introP4" style="display:none;">
         <div class="intro-title-star">&#9733;</div>
-        <div class="intro-title">SURVIVAL QUEST</div>
+        <div class="intro-title">DEAD RECKONING</div>
         <div class="intro-title-star">&#9733;</div>
-        <div class="intro-tagline">"How far would you go to get home?"</div>
+        <div class="intro-tagline">"No signal. No map. No choice."</div>
         <div class="intro-skip">[ TAP TO SKIP ]</div>
       </div>
 
@@ -1517,7 +1517,7 @@
             <div class="scene-caption" id="sceneCaption"></div>
           </div>
           <div class="story" id="story">
-            <span class="t-system">// SURVIVAL QUEST v2.0 &mdash; SESSION STARTED</span><br><br>
+            <span class="t-system">// DEAD RECKONING — SESSION STARTED</span><br><br>
             You wake up late. Again. Your hand slaps the nightstand
             searching for your phone &mdash; dead. No alarm, no screen
             glow, nothing. That&rsquo;s when you notice the ceiling fan has
@@ -1643,10 +1643,10 @@
         <div id="unlockError" class="unlock-error"></div>
         <div class="limit-donate">
           Get your unlock code instantly after payment:<br>
-          <span style="color:var(--amber);">gumroad.com/l/survivalquest</span><br>
+          <span style="color:var(--amber);">gumroad.com/l/deadreckoning</span><br>
           <span style="color:var(--green);font-size:1.1em;letter-spacing:2px;">$2.99 — one time — play forever</span>
         </div>
-        <button class="unlock-btn" style="border-color:var(--green-dim);color:var(--green-dim);font-size:0.9em;margin-top:4px;" onclick="window.open('https://gumroad.com/l/survivalquest','_blank')">[ GET FULL VERSION — $2.99 ]</button>
+        <button class="unlock-btn" style="border-color:var(--green-dim);color:var(--green-dim);font-size:0.9em;margin-top:4px;" onclick="window.open('https://gumroad.com/l/deadreckoning','_blank')">[ GET FULL VERSION — $2.99 ]</button>
         <button class="map-close" style="margin-top:8px;" onclick="hideLimitScreen()">[ CLOSE ]</button>
       </div>
     </div>
@@ -2033,7 +2033,7 @@ var gameState = {
 //  SYSTEM PROMPT  (v2.0 — 4 stats, win/lose)
 // ════════════════════════════════════════════
 function buildSystem() {
-  return `You are the narrator of SURVIVAL QUEST v2.0, a text adventure game.
+  return `You are the narrator of DEAD RECKONING, a text adventure game.
 
 == THE WORLD ==
 A massive solar flare struck Earth at 3:47am, triggering a global EMP.
@@ -2113,7 +2113,7 @@ Rules:
 var bootLines = [
   { text: 'VECTREX PRO 9000 BIOS v2.31',          bright: true, delay: 0    },
   { text: 'MEMORY CHECK............. 640K OK',                  delay: 300  },
-  { text: 'SURVIVAL QUEST v2.0',                   bright: true, delay: 700  },
+  { text: 'DEAD RECKONING v1.0',                  bright: true, delay: 700  },
   { text: 'NARRATIVE AI MODULE: ONLINE',                        delay: 1100 },
   { text: 'STAT TRACKING: MORALE / HUNGER / THIRST / ENERGY',  delay: 1500 },
   { text: 'SAVE SYSTEM: localStorage INITIALIZED',              delay: 1900 },
@@ -3251,8 +3251,9 @@ var VALID_CODES = [
   'SURVIVOR2024',
   'ALEXRILEYCUSTOM',
   'EMPDAY1UNLOCK',
-  'SURVIVALQUESTPRO',
-  'FULLVERSIONGO'
+  'DEADRECKONINGPRO',
+  'FULLVERSIONGO',
+  'NORECKONING'
   // Add more as needed when players donate
 ];
 
@@ -3402,7 +3403,7 @@ function tryUnlock() {
     addLine('<br><span style="color:var(--amber);letter-spacing:3px;">★ FULL VERSION UNLOCKED — Unlimited play activated. Thank you, Survivor. ★</span><br>', '');
     updateTurnCounter();
   } else {
-    errEl.textContent = '▸ Invalid code. Get yours at ko-fi.com/survivalquest';
+    errEl.textContent = '▸ Invalid code. Get yours at gumroad.com/l/deadreckoning';
     soundDeath();
     input.value = '';
   }
@@ -3507,11 +3508,17 @@ var EASTER_EGGS = {
     reason: '↑↑↓↓←→←→ B A',
     sound: 'achievement'
   },
-  'survival quest': {
-    response: 'You say the name of the game you are currently in. A strange recursive dizziness washes over you. The narrator shifts uncomfortably. Let\'s not do that again.',
+  'dead reckoning': {
+    response: 'You say the name of the game you are currently inside. A strange recursive dizziness washes over you. Dead reckoning — navigation by estimating your position from a known point. Right now, your last known point is a warm bed. You have no idea where this ends.',
     points: 20,
     reason: 'Meta-awareness',
     sound: 'achievement'
+  },
+  'survival quest': {
+    response: 'You mutter the name of a different game entirely. Nothing happens. Though somewhere, Roger Wilco tips his mop in quiet solidarity.',
+    points: 10,
+    reason: 'Wrong game, right instinct',
+    sound: 'response'
   }
 };
 
