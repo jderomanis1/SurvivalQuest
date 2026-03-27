@@ -10,8 +10,10 @@ var FULL_VERSION_CODES = [  // must match client-side list
   'SURVIVOR2024',
   'ALEXRILEYCUSTOM',
   'EMPDAY1UNLOCK',
-  'SURVIVALQUESTPRO',
-  'FULLVERSIONGO'
+  'DARKCOMMUTEPRO',
+  'FULLVERSIONGO',
+  'NORECKONING',
+  'BADCOMMUTE'
 ];
 
 function getTodayKey() {
