@@ -164,11 +164,11 @@
 
     .panel-title {
       font-family: 'VT323', monospace;
-      color: #888;
-      font-size: 0.85em;
+      color: var(--green);
+      font-size: 0.9em;
       letter-spacing: 3px;
-      border-bottom: 1px solid var(--green-glow);
-      padding-bottom: 4px;
+      border-bottom: 1px solid var(--green-dim);
+      padding-bottom: 3px;
       margin-bottom: 4px;
     }
 
@@ -183,8 +183,8 @@
       margin-bottom: 2px;
     }
 
-    .stat-name { color: #888; font-size: 0.62em; letter-spacing: 1px; }
-    .stat-val  { color: var(--green); font-size: 0.62em; }
+    .stat-name { color: var(--green-dim); font-size: 0.65em; letter-spacing: 1px; }
+    .stat-val  { color: var(--green); font-size: 0.65em; font-weight: bold; }
 
     .stat-track {
       background: #001a00;
@@ -273,8 +273,8 @@
        QUICK ACTIONS
     ═══════════════════════════════ */
     .quick-actions {
-      background: #000500;
-      border-top: 1px solid var(--green-glow);
+      background: #000800;
+      border-top: 1px solid var(--green-dim);
       padding: 8px 12px;
       display: flex;
       flex-wrap: wrap;
@@ -282,12 +282,12 @@
     }
 
     .quick-btn {
-      background: transparent;
-      border: 1px solid #1a3a1a;
-      color: var(--green-dim);
+      background: #001400;
+      border: 1px solid var(--green-dim);
+      color: var(--green);
       font-family: 'Share Tech Mono', monospace;
-      font-size: 0.7em;
-      padding: 4px 10px;
+      font-size: 0.72em;
+      padding: 5px 12px;
       cursor: pointer;
       letter-spacing: 1px;
       transition: all 0.15s;
@@ -299,10 +299,10 @@
       background: var(--green-dark);
       border-color: var(--green);
       color: var(--green);
-      box-shadow: 0 0 8px var(--green-glow);
+      box-shadow: 0 0 10px var(--green-glow);
     }
 
-    .quick-btn:disabled { opacity: 0.2; cursor: default; }
+    .quick-btn:disabled { opacity: 0.25; cursor: default; }
 
     /* ═══════════════════════════════
        INPUT AREA
@@ -334,7 +334,7 @@
       caret-color: var(--amber);
     }
 
-    .cmd-input::placeholder { color: #666; font-style: italic; }
+    .cmd-input::placeholder { color: #777; font-style: italic; }
     .cmd-input:disabled { opacity: 0.35; }
 
     .go-btn {
@@ -357,9 +357,9 @@
        FOOTER
     ═══════════════════════════════ */
     .screen-footer {
-      background: #000;
-      border-top: 1px solid #1a1a1a;
-      padding: 5px 12px;
+      background: #000a00;
+      border-top: 1px solid var(--green-dim);
+      padding: 6px 12px;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
@@ -367,12 +367,10 @@
       gap: 4px;
     }
 
-    .footer-txt  { font-size: 0.62em; color: #888; letter-spacing: 1px; flex: 1; min-width: 120px; }
-    .footer-save { font-size: 0.64em; color: var(--green-dim); letter-spacing: 1px; cursor: pointer; white-space: nowrap; padding: 2px 4px; }
-    .footer-save:hover { color: var(--green); }
-
-    /* Footer action group — keeps buttons together */
-    .footer-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+    .footer-txt  { font-size: 0.65em; color: var(--green-dim); letter-spacing: 1px; flex: 1; min-width: 120px; }
+    .footer-save { font-size: 0.68em; color: var(--green); letter-spacing: 1px; cursor: pointer; white-space: nowrap; padding: 3px 6px; border: 1px solid #003300; border-radius: 2px; }
+    .footer-save:hover { color: #000; background: var(--green); border-color: var(--green); }
+    .footer-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
     /* ═══════════════════════════════
        BOOT SCREEN
@@ -2164,23 +2162,31 @@ function checkTensionAudio() {
 // ── Toggle ambient with mute ───────────────
 function toggleMute() {
   audioEnabled = !audioEnabled;
-  document.getElementById('muteBtn').textContent =
-    audioEnabled ? '♪ SFX ON' : '♪ SFX OFF';
+  var btn = document.getElementById('muteBtn');
+
   if (!audioEnabled) {
-    stopAmbient();
-    stopHeartbeat();
-  } else {
-    // Resume AudioContext if browser suspended it
+    // INSTANT silence — suspend the entire AudioContext
+    btn.textContent = '♪ SFX OFF';
+    btn.style.color = 'var(--red)';
     try {
       var ctx = getAudioCtx();
-      if (ctx && ctx.state === 'suspended') {
+      if (ctx) ctx.suspend();
+    } catch(e) {}
+    stopHeartbeat();
+  } else {
+    // Resume everything
+    btn.textContent = '♪ SFX ON';
+    btn.style.color = '';
+    try {
+      var ctx = getAudioCtx();
+      if (ctx) {
         ctx.resume().then(function() {
+          currentAmbient = null; // force restart
           startAmbient(gameState.location);
         });
-      } else {
-        startAmbient(gameState.location);
       }
     } catch(e) {
+      currentAmbient = null;
       startAmbient(gameState.location);
     }
   }
