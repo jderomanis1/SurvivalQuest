@@ -642,8 +642,65 @@
     }
 
     /* ═══════════════════════════════
-       LIMIT / PAYWALL SCREEN
+       CHARACTER PORTRAIT
     ═══════════════════════════════ */
+    .portrait-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 0;
+    }
+
+    .portrait-art {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62em;
+      line-height: 1.25;
+      white-space: pre;
+      text-align: center;
+      transition: color 0.8s ease, text-shadow 0.8s ease;
+      letter-spacing: 1px;
+    }
+
+    .portrait-art.state-confident {
+      color: var(--green);
+      text-shadow: 0 0 6px var(--green);
+    }
+
+    .portrait-art.state-worried {
+      color: var(--amber);
+      text-shadow: 0 0 6px var(--amber-dim);
+    }
+
+    .portrait-art.state-desperate {
+      color: var(--red);
+      text-shadow: 0 0 8px var(--red);
+      animation: portraitPulse 1s infinite;
+    }
+
+    @keyframes portraitPulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.6; }
+    }
+
+    .portrait-name {
+      font-family: 'VT323', monospace;
+      font-size: 1em;
+      letter-spacing: 3px;
+      color: var(--amber);
+      text-align: center;
+    }
+
+    .portrait-status {
+      font-size: 0.55em;
+      letter-spacing: 2px;
+      text-align: center;
+      transition: color 0.5s ease;
+    }
+
+    .status-confident { color: var(--green-dim); }
+    .status-worried   { color: var(--amber); }
+    .status-desperate { color: var(--red); }
     #limitScreen {
       display: none;
       position: absolute;
@@ -1591,6 +1648,15 @@
             <div class="day-sub" id="timeValue">09:14 AM</div>
           </div>
 
+          <div class="sidebar-section">
+            <div class="panel-title">SURVIVOR</div>
+            <div class="portrait-wrap" id="portraitWrap">
+              <div class="portrait-art" id="portraitArt"></div>
+              <div class="portrait-name" id="portraitName">—</div>
+              <div class="portrait-status" id="portraitStatus">READY</div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -2107,6 +2173,7 @@ function selectChar(name, subject, object, possessive) {
   setSceneByLocation(gameState.location);
   updateHintButtons(gameState.location);
   startAmbient(gameState.location);
+  updatePortrait();
   document.getElementById('cmdInput').focus();
 }
 
@@ -3446,6 +3513,7 @@ function applyParsed(p) {
 
   applyState();
   checkTensionAudio();
+  updatePortrait();
 }
 
 // ════════════════════════════════════════════
@@ -3538,6 +3606,155 @@ function quickCmd(cmd) {
 function setQuickActionsDisabled(disabled) {
   var btns = document.querySelectorAll('.quick-btn');
   btns.forEach(function(b){ b.disabled = disabled; });
+}
+
+// ════════════════════════════════════════════
+//  CHARACTER PORTRAIT SYSTEM
+// ════════════════════════════════════════════
+
+// Three emotional states per gender expression
+// Each has a distinct ASCII face + body
+
+var PORTRAITS = {
+  male: {
+    confident: [
+      '  ___  ',
+      ' /o o\\ ',
+      ' \\ ^ / ',
+      '  \\_/  ',
+      ' /|X|\\ ',
+      '   |   ',
+      '  / \\  '
+    ],
+    worried: [
+      '  ___  ',
+      ' /- -\\ ',
+      ' \\ ~ / ',
+      '  \\_/  ',
+      ' /|X|\\ ',
+      '   |   ',
+      '  / \\  '
+    ],
+    desperate: [
+      '  ___  ',
+      ' /x x\\ ',
+      ' \\ ° / ',
+      '  \\_/  ',
+      ' \\|X|/ ',
+      '   |   ',
+      '  / \\  '
+    ]
+  },
+  female: {
+    confident: [
+      '  ___  ',
+      ' /o o\\ ',
+      ' \\ ^ / ',
+      '  \\_/  ',
+      ' /]X[\\ ',
+      '   |   ',
+      '  / \\  '
+    ],
+    worried: [
+      '  ___  ',
+      ' /- -\\ ',
+      ' \\ ~ / ',
+      '  \\_/  ',
+      ' /]X[\\ ',
+      '   |   ',
+      '  / \\  '
+    ],
+    desperate: [
+      '  ___  ',
+      ' /x x\\ ',
+      ' \\ ° / ',
+      '  \\_/  ',
+      ' \\]X[/ ',
+      '   |   ',
+      '  / \\  '
+    ]
+  },
+  neutral: {
+    confident: [
+      '  ___  ',
+      ' /· ·\\ ',
+      ' \\ ^ / ',
+      '  \\_/  ',
+      ' /|X|\\ ',
+      '   |   ',
+      '  / \\  '
+    ],
+    worried: [
+      '  ___  ',
+      ' /· ·\\ ',
+      ' \\ ~ / ',
+      '  \\_/  ',
+      ' /|X|\\ ',
+      '   |   ',
+      '  / \\  '
+    ],
+    desperate: [
+      '  ___  ',
+      ' /· ·\\ ',
+      ' \\ ° / ',
+      '  \\_/  ',
+      ' \\|X|/ ',
+      '   |   ',
+      '  / \\  '
+    ]
+  }
+};
+
+// Status messages per state
+var PORTRAIT_STATUS = {
+  confident: ['READY',    'FOCUSED',  'ALERT',    'STEADY'  ],
+  worried:   ['WORRIED',  'UNEASY',   'ANXIOUS',  'STRESSED'],
+  desperate: ['CRITICAL', 'PANICKED', 'DESPERATE','FAILING' ]
+};
+
+function getPortraitState() {
+  var min = Math.min(
+    gameState.morale || 100,
+    gameState.hunger  || 100,
+    gameState.thirst  || 100,
+    gameState.energy  || 100
+  );
+  if (min >= 60) return 'confident';
+  if (min >= 30) return 'worried';
+  return 'desperate';
+}
+
+function getPortraitType() {
+  var s = character.subject || 'he';
+  if (s === 'she') return 'female';
+  if (s === 'they') return 'neutral';
+  return 'male';
+}
+
+function updatePortrait() {
+  var artEl    = document.getElementById('portraitArt');
+  var nameEl   = document.getElementById('portraitName');
+  var statusEl = document.getElementById('portraitStatus');
+  if (!artEl) return;
+
+  var state   = getPortraitState();
+  var type    = getPortraitType();
+  var frames  = PORTRAITS[type][state];
+  var statuses = PORTRAIT_STATUS[state];
+  var status  = statuses[Math.floor(Math.random() * statuses.length)];
+
+  // Update art
+  artEl.textContent = frames.join('\n');
+  artEl.className   = 'portrait-art state-' + state;
+
+  // Update name
+  if (nameEl) nameEl.textContent = character.name || '—';
+
+  // Update status
+  if (statusEl) {
+    statusEl.textContent = status;
+    statusEl.className   = 'portrait-status status-' + state;
+  }
 }
 
 // ════════════════════════════════════════════
@@ -4046,6 +4263,7 @@ window.onload = function() {
     updateHintButtons(gameState.location);
     startAmbient(gameState.location);
     checkTensionAudio();
+    updatePortrait();
     var helpEl = document.getElementById('helpCharName');
     if (helpEl) helpEl.textContent = character.name;
     document.getElementById('cmdInput').focus();
