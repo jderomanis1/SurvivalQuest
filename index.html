@@ -799,6 +799,70 @@
       .map-cell { width: 44px; height: 32px; }
       .map-title { font-size: 1em; letter-spacing: 2px; }
     }
+    /* ═══════════════════════════════
+       ACHIEVEMENT POPUP
+    ═══════════════════════════════ */
+    #achievementPopup {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999;
+      animation: achSlideIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    }
+
+    .ach-inner {
+      background: #000a00;
+      border: 1px solid var(--amber);
+      box-shadow: 0 0 24px rgba(255,176,0,0.3), 0 4px 20px rgba(0,0,0,0.8);
+      padding: 14px 18px;
+      min-width: 200px;
+      max-width: 260px;
+      text-align: center;
+    }
+
+    .ach-header {
+      font-size: 0.55em;
+      color: var(--amber);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #996800;
+      padding-bottom: 6px;
+    }
+
+    .ach-icon { font-size: 2em; margin: 6px 0; }
+
+    .ach-name {
+      font-family: 'VT323', monospace;
+      color: var(--green);
+      font-size: 1.3em;
+      letter-spacing: 3px;
+      text-shadow: 0 0 8px var(--green);
+      margin-bottom: 4px;
+    }
+
+    .ach-desc {
+      color: var(--green-dim);
+      font-size: 0.6em;
+      letter-spacing: 1px;
+      line-height: 1.5;
+    }
+
+    @keyframes achSlideIn {
+      from { opacity: 0; transform: translateX(60px) scale(0.8); }
+      to   { opacity: 1; transform: translateX(0)    scale(1);   }
+    }
+
+    @keyframes achSlideOut {
+      from { opacity: 1; transform: translateX(0)    scale(1);   }
+      to   { opacity: 0; transform: translateX(60px) scale(0.8); }
+    }
+
+    @media (max-width: 520px) {
+      #achievementPopup { bottom: 12px; right: 8px; left: 8px; }
+      .ach-inner { max-width: 100%; }
+    }
+
     #dayBanner {
       display: none;
       position: absolute;
@@ -1198,6 +1262,17 @@
     </div>
 
   </div><!-- /crt -->
+
+  <!-- ACHIEVEMENT POPUP — lives outside CRT so it floats over everything -->
+  <div id="achievementPopup">
+    <div class="ach-inner">
+      <div class="ach-header">&#9670; ACHIEVEMENT UNLOCKED &#9670;</div>
+      <div class="ach-icon" id="achIcon">🏆</div>
+      <div class="ach-name" id="achName">PREPARED</div>
+      <div class="ach-desc" id="achDesc">You picked up your first item.</div>
+    </div>
+  </div>
+
 </div><!-- /monitor -->
 
 <script>
@@ -1781,6 +1856,177 @@ function renderInventoryGrid(inv) {
 }
 
 // ════════════════════════════════════════════
+//  ACHIEVEMENT SYSTEM
+// ════════════════════════════════════════════
+
+var ACHIEVEMENTS = {
+  first_item: {
+    icon: '🎒', name: 'PREPARED',
+    desc: 'You picked up your first item.',
+    unlocked: false
+  },
+  left_apartment: {
+    icon: '🚪', name: 'FIRST STEPS',
+    desc: 'You left the apartment. No going back.',
+    unlocked: false
+  },
+  met_chen: {
+    icon: '👵', name: 'NOT ALONE',
+    desc: 'Mrs Chen knows things. Listen carefully.',
+    unlocked: false
+  },
+  day3: {
+    icon: '🌅', name: 'STILL STANDING',
+    desc: 'Three days in. Most people have given up.',
+    unlocked: false
+  },
+  reached_bridge: {
+    icon: '🌉', name: 'THE CROSSING',
+    desc: 'The bridge. Halfway there.',
+    unlocked: false
+  },
+  found_map: {
+    icon: '🗺️', name: 'NAVIGATOR',
+    desc: 'A paper map. Old school but it works.',
+    unlocked: false
+  },
+  found_flashlight: {
+    icon: '🔦', name: 'LIGHT BRINGER',
+    desc: 'Darkness is your enemy. Not anymore.',
+    unlocked: false
+  },
+  reached_street: {
+    icon: '🏙️', name: 'INTO THE WILD',
+    desc: 'The city is chaos. You step outside anyway.',
+    unlocked: false
+  },
+  won: {
+    icon: '🏠', name: 'HOMECOMING',
+    desc: 'You made it. Against all odds.',
+    unlocked: false
+  }
+};
+
+// Save/load unlocked achievements
+function saveAchievements() {
+  try {
+    var unlocked = Object.keys(ACHIEVEMENTS).filter(function(k) {
+      return ACHIEVEMENTS[k].unlocked;
+    });
+    localStorage.setItem('sq_ach', JSON.stringify(unlocked));
+  } catch(e) {}
+}
+
+function loadAchievements() {
+  try {
+    var saved = localStorage.getItem('sq_ach');
+    if (saved) {
+      JSON.parse(saved).forEach(function(k) {
+        if (ACHIEVEMENTS[k]) ACHIEVEMENTS[k].unlocked = true;
+      });
+    }
+  } catch(e) {}
+}
+
+// Achievement popup queue — shows one at a time
+var achQueue = [];
+var achShowing = false;
+
+function unlockAchievement(key) {
+  var ach = ACHIEVEMENTS[key];
+  if (!ach || ach.unlocked) return; // already got it
+  ach.unlocked = true;
+  saveAchievements();
+  achQueue.push(ach);
+  if (!achShowing) showNextAchievement();
+}
+
+function showNextAchievement() {
+  if (achQueue.length === 0) { achShowing = false; return; }
+  achShowing = true;
+  var ach = achQueue.shift();
+
+  var popup = document.getElementById('achievementPopup');
+  document.getElementById('achIcon').textContent = ach.icon;
+  document.getElementById('achName').textContent = ach.name;
+  document.getElementById('achDesc').textContent = ach.desc;
+
+  // Play a special achievement sound
+  soundAchievement();
+
+  // Show with slide-in animation
+  popup.style.animation = 'none';
+  popup.style.display   = 'block';
+  void popup.offsetWidth; // force reflow so animation restarts
+  popup.style.animation = 'achSlideIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards';
+
+  // Also log it permanently in the story
+  setTimeout(function() {
+    addLine('<br><span style="color:var(--amber);font-size:0.85em;">&#9670; ' +
+      ach.icon + ' ' + ach.name + ' — ' + ach.desc +
+      ' &#9670;</span><br>', '');
+  }, 300);
+
+  // Slide out after 4 seconds, then show next in queue
+  setTimeout(function() {
+    popup.style.animation = 'achSlideOut 0.4s ease forwards';
+    setTimeout(function() {
+      popup.style.display = 'none';
+      showNextAchievement();
+    }, 400);
+  }, 4000);
+}
+
+// Achievement sound — bright ascending chime
+function soundAchievement() {
+  beep('square', 523, 0.1, 0.12);
+  beep('square', 659, 0.1, 0.12, 0.1);
+  beep('square', 784, 0.2, 0.15, 0.2);
+}
+
+// ── Check achievements after every Claude response ──
+function checkAchievements(parsed) {
+  var inv      = gameState.inventory || [];
+  var loc      = (parsed.location || '').toLowerCase();
+  var locKey   = getSceneKey(parsed.location || '');
+
+  // First item picked up
+  if (inv.length >= 1) unlockAchievement('first_item');
+
+  // Found the map
+  if (inv.some(function(i){ return i.toLowerCase().indexOf('map') !== -1; }))
+    unlockAchievement('found_map');
+
+  // Found the flashlight
+  if (inv.some(function(i){ return i.toLowerCase().indexOf('flash') !== -1 || i.toLowerCase().indexOf('light') !== -1; }))
+    unlockAchievement('found_flashlight');
+
+  // Left the apartment — reached hallway or beyond
+  var outsideApt = ['hallway','stairwell','street','store','park','bridge','highway','suburb'];
+  if (outsideApt.indexOf(locKey) !== -1)
+    unlockAchievement('left_apartment');
+
+  // Reached street level
+  var streetLevel = ['street','store','park'];
+  if (streetLevel.indexOf(locKey) !== -1)
+    unlockAchievement('reached_street');
+
+  // Met Mrs Chen — detect in narration text
+  var narration = (parsed.narration || '').toLowerCase();
+  if (narration.indexOf('chen') !== -1 || narration.indexOf('6b') !== -1)
+    unlockAchievement('met_chen');
+
+  // Reached bridge
+  if (locKey === 'bridge') unlockAchievement('reached_bridge');
+
+  // Survived Day 3
+  if ((gameState.day || 1) >= 3) unlockAchievement('day3');
+
+  // Won the game
+  if (locKey === 'suburb') unlockAchievement('won');
+}
+
+// ════════════════════════════════════════════
 //  MAP SYSTEM
 // ════════════════════════════════════════════
 
@@ -2358,6 +2604,7 @@ function sendCommand() {
         applyParsed(parsed);
         if (el) el.remove();
         soundResponse();
+        checkAchievements(parsed);
         if (!checkGameOver(parsed)) {
           addLine(parsed.narration + '<br><span class="cursor"></span>', 't-narrator');
         }
@@ -2414,6 +2661,7 @@ window.onload = function() {
 
     var loaded = loadGame();
     loadVisited();
+    loadAchievements();
 
     if (loaded) {
       // Returning player — skip char select, go straight to game
