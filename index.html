@@ -644,8 +644,127 @@
     }
 
     /* ═══════════════════════════════
-       SCORE NOTIFICATION
+       LIMIT / PAYWALL SCREEN
     ═══════════════════════════════ */
+    #limitScreen {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.97);
+      z-index: 60;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: mapSlideIn 0.3s ease forwards;
+    }
+
+    .limit-inner {
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .limit-title {
+      font-family: 'VT323', monospace;
+      color: var(--amber);
+      font-size: 1.8em;
+      letter-spacing: 4px;
+      text-shadow: 0 0 16px var(--amber);
+    }
+
+    .limit-msg {
+      color: var(--green-dim);
+      font-size: 0.68em;
+      letter-spacing: 1px;
+      line-height: 2;
+    }
+
+    .limit-timer {
+      color: var(--amber);
+      font-family: 'VT323', monospace;
+      font-size: 1.3em;
+      letter-spacing: 3px;
+    }
+
+    .limit-divider {
+      color: #333;
+      font-size: 0.6em;
+      letter-spacing: 3px;
+      width: 100%;
+      border-top: 1px solid #111;
+      border-bottom: 1px solid #111;
+      padding: 6px 0;
+    }
+
+    .limit-unlock-title {
+      color: var(--green);
+      font-size: 0.65em;
+      letter-spacing: 2px;
+    }
+
+    .unlock-input {
+      background: #000a00;
+      border: 1px solid var(--green-dim);
+      color: var(--amber);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.85em;
+      padding: 8px 14px;
+      width: 100%;
+      outline: none;
+      letter-spacing: 2px;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .unlock-btn {
+      background: transparent;
+      border: 1px solid var(--amber-dim);
+      color: var(--amber);
+      font-family: 'VT323', monospace;
+      font-size: 1.2em;
+      padding: 6px 20px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      width: 100%;
+      transition: all 0.2s;
+    }
+
+    .unlock-btn:hover {
+      background: var(--amber);
+      color: #000;
+      box-shadow: 0 0 16px var(--amber);
+    }
+
+    .unlock-error {
+      color: var(--red);
+      font-size: 0.6em;
+      letter-spacing: 1px;
+      min-height: 1em;
+    }
+
+    .limit-donate {
+      color: #444;
+      font-size: 0.58em;
+      letter-spacing: 1px;
+      line-height: 1.8;
+      border-top: 1px solid #111;
+      padding-top: 10px;
+      width: 100%;
+    }
+
+    .limit-full-badge {
+      color: var(--amber);
+      font-family: 'VT323', monospace;
+      font-size: 1em;
+      letter-spacing: 2px;
+      border: 1px solid var(--amber-dim);
+      padding: 2px 10px;
+    }
     #scoreNotif {
       display: none;
       position: absolute;
@@ -1493,9 +1612,41 @@
       <!-- FOOTER -->
       <div class="screen-footer">
         <div class="footer-txt" id="footerSector">&#9608; CITY SECTOR 7 &nbsp;|&nbsp; EMP EVENT DAY 1</div>
+        <div class="footer-save" id="turnCounter" onclick="showLimitScreen()" title="Daily turns remaining" style="color:var(--green-dim);cursor:pointer;">&#9632; 20 LEFT</div>
         <div class="footer-save" onclick="clearSave()" title="Reset game">&#9673; RESET</div>
         <div class="footer-save" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#9834; SFX ON</div>
         <div class="footer-save" onclick="toggleMap()" title="Toggle map">&#9638; MAP</div>
+      </div>
+    </div>
+
+    <!-- LIMIT SCREEN -->
+    <div id="limitScreen">
+      <div class="limit-inner">
+        <div class="limit-title">&#9646;&#9646; SIGNAL LOST &#9646;&#9646;</div>
+        <div class="limit-msg">
+          You've used your 20 free turns for today.<br>
+          The city doesn't sleep — but you have to.<br><br>
+          Come back tomorrow for 20 more free turns.<br>
+          Or unlock the full version to play unlimited.
+        </div>
+        <div class="limit-timer" id="limitTimer">Next reset in: 00:00:00</div>
+        <div class="limit-divider">— OR —</div>
+        <div class="limit-unlock-title">&#9670; ENTER UNLOCK CODE &#9670;</div>
+        <input
+          id="unlockInput"
+          class="unlock-input"
+          type="text"
+          placeholder="enter your code..."
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="32"
+        />
+        <button class="unlock-btn" onclick="tryUnlock()">[ UNLOCK FULL VERSION ]</button>
+        <div id="unlockError" class="unlock-error"></div>
+        <div class="limit-donate">
+          Get your unlock code at
+          <span style="color:var(--amber);">ko-fi.com/survivalquest</span>
+        </div>
       </div>
     </div>
 
@@ -3086,6 +3237,175 @@ function setQuickActionsDisabled(disabled) {
 }
 
 // ════════════════════════════════════════════
+//  RATE LIMITING & FULL VERSION SYSTEM
+// ════════════════════════════════════════════
+
+var FREE_TURNS_PER_DAY = 20;
+var isFullVersion = false;
+
+// Unlock codes — SHA-style simple check
+// In production you'd hash these, but for now a list works
+// Players get these after supporting on Ko-fi
+var VALID_CODES = [
+  'SURVIVOR2024',
+  'ALEXRILEYCUSTOM',
+  'EMPDAY1UNLOCK',
+  'SURVIVALQUESTPRO',
+  'FULLVERSIONGO'
+  // Add more as needed when players donate
+];
+
+function loadRateLimit() {
+  try {
+    // Check full version unlock
+    var unlocked = localStorage.getItem('sq_fullversion');
+    if (unlocked === 'true') {
+      isFullVersion = true;
+      showFullVersionBadge();
+      return;
+    }
+
+    // Load today's turn count
+    var saved = localStorage.getItem('sq_turns');
+    if (saved) {
+      var data = JSON.parse(saved);
+      var today = new Date().toDateString();
+      if (data.date === today) {
+        turnsUsedToday = data.count || 0;
+      } else {
+        // New day — reset counter
+        turnsUsedToday = 0;
+        saveTurns();
+      }
+    }
+    updateTurnCounter();
+  } catch(e) {}
+}
+
+var turnsUsedToday = 0;
+
+function saveTurns() {
+  try {
+    localStorage.setItem('sq_turns', JSON.stringify({
+      date:  new Date().toDateString(),
+      count: turnsUsedToday
+    }));
+  } catch(e) {}
+}
+
+function incrementTurns() {
+  turnsUsedToday++;
+  saveTurns();
+  updateTurnCounter();
+}
+
+function turnsRemaining() {
+  return Math.max(0, FREE_TURNS_PER_DAY - turnsUsedToday);
+}
+
+function isLimitReached() {
+  if (isFullVersion) return false;
+  return turnsUsedToday >= FREE_TURNS_PER_DAY;
+}
+
+function updateTurnCounter() {
+  var el = document.getElementById('turnCounter');
+  if (!el) return;
+
+  if (isFullVersion) {
+    el.textContent = '★ FULL';
+    el.style.color = 'var(--amber)';
+    el.title = 'Full version — unlimited turns';
+    el.onclick = null;
+    el.style.cursor = 'default';
+    return;
+  }
+
+  var left = turnsRemaining();
+  el.textContent = '◾ ' + left + ' LEFT';
+  el.style.color = left <= 5 ? 'var(--red)' :
+                   left <= 10 ? 'var(--amber)' :
+                   'var(--green-dim)';
+}
+
+function showLimitScreen() {
+  if (isFullVersion) return;
+  document.getElementById('limitScreen').style.display = 'flex';
+  startLimitTimer();
+}
+
+function hideLimitScreen() {
+  document.getElementById('limitScreen').style.display = 'none';
+}
+
+// Countdown to midnight reset
+var limitTimerInterval = null;
+function startLimitTimer() {
+  if (limitTimerInterval) clearInterval(limitTimerInterval);
+
+  function update() {
+    var now      = new Date();
+    var midnight = new Date();
+    midnight.setHours(24, 0, 0, 0);
+    var diff = midnight - now;
+
+    var h = Math.floor(diff / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var s = Math.floor((diff % 60000) / 1000);
+
+    var el = document.getElementById('limitTimer');
+    if (el) {
+      el.textContent = 'Next reset in: ' +
+        String(h).padStart(2,'0') + ':' +
+        String(m).padStart(2,'0') + ':' +
+        String(s).padStart(2,'0');
+    }
+  }
+  update();
+  limitTimerInterval = setInterval(update, 1000);
+}
+
+// Unlock code validation
+function tryUnlock() {
+  var input = document.getElementById('unlockInput');
+  var errEl = document.getElementById('unlockError');
+  var code  = input.value.trim().toUpperCase();
+
+  if (!code) {
+    errEl.textContent = '▸ Please enter your unlock code';
+    return;
+  }
+
+  if (VALID_CODES.indexOf(code) !== -1) {
+    // Valid code!
+    isFullVersion = true;
+    try {
+      localStorage.setItem('sq_fullversion', 'true');
+      localStorage.setItem('sq_fullversion_code', code);
+    } catch(e) {}
+    hideLimitScreen();
+    showFullVersionBadge();
+    soundVictory();
+    addLine('<br><span style="color:var(--amber);letter-spacing:3px;">★ FULL VERSION UNLOCKED — Unlimited play activated. Thank you, Survivor. ★</span><br>', '');
+    updateTurnCounter();
+  } else {
+    errEl.textContent = '▸ Invalid code. Get yours at ko-fi.com/survivalquest';
+    soundDeath();
+    input.value = '';
+  }
+}
+
+function showFullVersionBadge() {
+  // Add ★ FULL badge to header if not already there
+  var badges = document.getElementById('versionBadge');
+  if (badges) {
+    badges.textContent = '★ FULL';
+    badges.style.color = 'var(--amber)';
+    badges.style.borderColor = 'var(--amber-dim)';
+  }
+}
+
+// ════════════════════════════════════════════
 //  EASTER EGG SYSTEM
 // ════════════════════════════════════════════
 
@@ -3251,6 +3571,15 @@ function sendCommand() {
     triggerEasterEgg(val, egg);
     return; // stop here, don't call Claude
   }
+
+  // ── Rate limit check ──
+  if (isLimitReached()) {
+    input.disabled = false;
+    goBtn.disabled = false;
+    setQuickActionsDisabled(false);
+    showLimitScreen();
+    return;
+  }
   addLine('&gt; ' + val + '<br>', 't-player');
 
   // Animated waiting dots
@@ -3301,6 +3630,14 @@ function sendCommand() {
         return;
       }
       var data = JSON.parse(xhr.responseText);
+      // Handle server-side rate limit
+      if (xhr.status === 429 || (data.error && data.error.code === 'RATE_LIMIT')) {
+        if (el) el.remove();
+        chatLog.pop();
+        done();
+        showLimitScreen();
+        return;
+      }
       if (data.error) {
         if (el) el.remove();
         addLine('ERROR: ' + data.error.message + '<br>', 't-err');
@@ -3312,6 +3649,7 @@ function sendCommand() {
         applyParsed(parsed);
         if (el) el.remove();
         soundResponse();
+        incrementTurns();
         checkAchievements(parsed);
         handleClaudePoints(parsed);
         if (parsed.day && parsed.day > (gameState.day || 1)) checkDayPoints(parsed.day);
@@ -3349,7 +3687,8 @@ function sendCommand() {
     model:      'claude-haiku-4-5-20251001',
     max_tokens: 600,
     system:     buildSystem(),
-    messages:   chatLog
+    messages:   chatLog,
+    unlockCode: isFullVersion ? localStorage.getItem('sq_fullversion_code') || '' : ''
   }));
 }
 
@@ -3370,6 +3709,7 @@ window.onload = function() {
   loadAchievements();
   loadVisited();
   loadScore();
+  loadRateLimit();
 
   var loaded = loadGame();
 
