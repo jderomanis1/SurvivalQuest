@@ -800,8 +800,198 @@
       .map-title { font-size: 1em; letter-spacing: 2px; }
     }
     /* ═══════════════════════════════
-       ACHIEVEMENT POPUP
+       INTRO CINEMATIC
     ═══════════════════════════════ */
+    #introScreen {
+      position: relative;
+      min-height: 340px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .intro-panel {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      animation: introPanelFade 0.6s ease forwards;
+    }
+
+    @keyframes introPanelFade {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes introPanelOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    /* Panel 1 — Silence */
+    .intro-dot {
+      width: 6px;
+      height: 6px;
+      background: #fff;
+      border-radius: 50%;
+      animation: dotPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes dotPulse {
+      0%,100% { opacity: 0.2; transform: scale(1); }
+      50%      { opacity: 1;   transform: scale(1.6); }
+    }
+
+    .intro-time {
+      font-family: 'VT323', monospace;
+      color: #ffffff22;
+      font-size: 3em;
+      letter-spacing: 8px;
+      animation: timeReveal 2s ease forwards;
+    }
+
+    @keyframes timeReveal {
+      0%   { color: #ffffff00; }
+      50%  { color: #ffffff44; }
+      100% { color: #ffffff88; }
+    }
+
+    /* Panel 2 — EMP rings */
+    .emp-rings {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin-bottom: 16px;
+    }
+
+    .emp-ring {
+      position: absolute;
+      inset: 0;
+      border: 1px solid var(--amber);
+      border-radius: 50%;
+      animation: empExpand 1.4s ease-out infinite;
+      opacity: 0;
+    }
+
+    @keyframes empExpand {
+      0%   { transform: scale(0.1); opacity: 0.8; }
+      100% { transform: scale(3);   opacity: 0; }
+    }
+
+    .intro-event-text {
+      font-family: 'VT323', monospace;
+      color: var(--amber);
+      font-size: 1.6em;
+      letter-spacing: 4px;
+      text-shadow: 0 0 20px var(--amber);
+      animation: textFlicker 0.15s step-end 3;
+    }
+
+    .intro-event-sub {
+      color: #666;
+      font-size: 0.7em;
+      letter-spacing: 2px;
+      margin-top: 8px;
+    }
+
+    @keyframes textFlicker {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0; }
+    }
+
+    /* Panel 3 — City */
+    .city-scape {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58em;
+      line-height: 1.3;
+      white-space: pre;
+      color: var(--green-dim);
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .city-scape .dark { color: #111; transition: color 0.3s; }
+
+    .intro-city-text {
+      font-family: 'VT323', monospace;
+      color: #444;
+      font-size: 1.2em;
+      letter-spacing: 4px;
+      margin-top: 14px;
+      animation: cityTextIn 1s ease 1s both;
+    }
+
+    @keyframes cityTextIn {
+      from { color: #444; }
+      to   { color: var(--green-dim); }
+    }
+
+    /* Panel 4 — Title */
+    .intro-title-star {
+      font-size: 1.4em;
+      color: var(--amber);
+      text-shadow: 0 0 20px var(--amber);
+      animation: starSpin 3s linear infinite;
+    }
+
+    @keyframes starSpin {
+      0%,100% { text-shadow: 0 0 10px var(--amber); }
+      50%      { text-shadow: 0 0 30px var(--amber), 0 0 60px var(--amber); }
+    }
+
+    .intro-title {
+      font-family: 'VT323', monospace;
+      color: var(--green);
+      font-size: 3em;
+      letter-spacing: 6px;
+      text-shadow: 0 0 20px var(--green), 0 0 40px var(--green);
+      animation: titleSlam 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    }
+
+    @keyframes titleSlam {
+      from { transform: scale(0.5); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    .intro-tagline {
+      color: #444;
+      font-size: 0.68em;
+      letter-spacing: 2px;
+      font-style: italic;
+      margin-top: 8px;
+      animation: taglineIn 1s ease 0.5s both;
+    }
+
+    @keyframes taglineIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .intro-skip {
+      position: absolute;
+      bottom: 14px;
+      right: 16px;
+      font-size: 0.55em;
+      color: #333;
+      letter-spacing: 1px;
+      animation: skipPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes skipPulse {
+      0%,100% { opacity: 0.3; }
+      50%      { opacity: 0.7; }
+    }
+
+    @media (max-width: 520px) {
+      .intro-title  { font-size: 2.2em; letter-spacing: 4px; }
+      .intro-time   { font-size: 2.2em; }
+      #introScreen  { min-height: 280px; }
+    }
     #achievementPopup {
       display: none;
       position: fixed;
@@ -1034,6 +1224,44 @@
         <!-- injected by JS -->
       </div>
       <div class="map-footer">PAPER MAP — HAND DRAWN — PROBABLY WRONG</div>
+    </div>
+
+    <!-- INTRO CINEMATIC -->
+    <div id="introScreen">
+
+      <!-- PANEL 1: Silence -->
+      <div class="intro-panel" id="introP1">
+        <div class="intro-dot"></div>
+        <div class="intro-time">3:47 AM</div>
+      </div>
+
+      <!-- PANEL 2: The Event -->
+      <div class="intro-panel" id="introP2" style="display:none;">
+        <div class="emp-rings">
+          <div class="emp-ring" style="animation-delay:0s"></div>
+          <div class="emp-ring" style="animation-delay:0.2s"></div>
+          <div class="emp-ring" style="animation-delay:0.4s"></div>
+          <div class="emp-ring" style="animation-delay:0.6s"></div>
+        </div>
+        <div class="intro-event-text">SOLAR FLARE — EMP EVENT</div>
+        <div class="intro-event-sub">Every device. Every car. Every light.</div>
+      </div>
+
+      <!-- PANEL 3: City Goes Dark -->
+      <div class="intro-panel" id="introP3" style="display:none;">
+        <div class="city-scape" id="cityScape"></div>
+        <div class="intro-city-text">THE CITY GOES SILENT.</div>
+      </div>
+
+      <!-- PANEL 4: Title Card -->
+      <div class="intro-panel" id="introP4" style="display:none;">
+        <div class="intro-title-star">&#9733;</div>
+        <div class="intro-title">SURVIVAL QUEST</div>
+        <div class="intro-title-star">&#9733;</div>
+        <div class="intro-tagline">"How far would you go to get home?"</div>
+        <div class="intro-skip">[ TAP TO SKIP ]</div>
+      </div>
+
     </div>
 
     <!-- BOOT SCREEN -->
@@ -1856,6 +2084,139 @@ function renderInventoryGrid(inv) {
 }
 
 // ════════════════════════════════════════════
+//  INTRO CINEMATIC ENGINE
+// ════════════════════════════════════════════
+
+var introSkipped = false;
+
+// ASCII cityscape — windows will flicker off one by one
+var CITY_ART = [
+  '  |##|  |####|  |##|  |####|  ',
+  '  |##|  |####|  |##|  |####|  ',
+  '  |##|  |    |  |##|  |####|  ',
+  '__|##|__|####|__|##|__|####|__',
+  '  |  |  |####|  |  |  |    |  ',
+  '  |  |  |####|  |  |  |    |  ',
+  '__|__|__|####|__|__|__|____|__',
+  '          |##|                 ',
+  '__________|##|_________________'
+].join('\n');
+
+function buildCityScape() {
+  var el = document.getElementById('cityScape');
+  if (!el) return;
+  // Replace # with lit windows as spans we can darken
+  var html = CITY_ART.replace(/#/g, function() {
+    return '<span class="win">░</span>';
+  });
+  el.innerHTML = html;
+}
+
+function flickerCityLights() {
+  var wins = document.querySelectorAll('#cityScape .win');
+  if (!wins.length) return;
+  var arr  = Array.from(wins);
+  var idx  = 0;
+
+  // Shuffle array for random order
+  arr.sort(function() { return Math.random() - 0.5; });
+
+  var interval = setInterval(function() {
+    if (idx >= arr.length) { clearInterval(interval); return; }
+    arr[idx].style.color   = '#111';
+    arr[idx].style.opacity = '0.2';
+    idx++;
+  }, 60);
+}
+
+// Sound: deep EMP burst
+function soundEMP() {
+  beep('sawtooth', [800, 40], 0.8, 0.25);
+  beep('sine',     [200, 30], 1.0, 0.15, 0.1);
+}
+
+// Sound: city hum dying
+function soundCityDark() {
+  beep('sine', [180, 60], 1.5, 0.1);
+}
+
+// Sound: title slam
+function soundTitleSlam() {
+  beep('square', [100, 440], 0.15, 0.2);
+  beep('square', 523, 0.2, 0.15, 0.15);
+  beep('square', 659, 0.3, 0.18, 0.3);
+}
+
+function showIntroPanel(id) {
+  // Hide all panels
+  ['introP1','introP2','introP3','introP4'].forEach(function(p) {
+    var el = document.getElementById(p);
+    if (el) el.style.display = 'none';
+  });
+  // Show target
+  var el = document.getElementById(id);
+  if (el) {
+    el.style.display = 'flex';
+    el.style.animation = 'introPanelFade 0.6s ease forwards';
+  }
+}
+
+function runIntro(onComplete) {
+  // Allow tapping anywhere to skip
+  var introEl = document.getElementById('introScreen');
+  introEl.onclick = function() {
+    introSkipped = true;
+    finishIntro(onComplete);
+  };
+
+  // ── Panel 1: Silence ──
+  showIntroPanel('introP1');
+
+  setTimeout(function() {
+    if (introSkipped) return;
+
+    // ── Panel 2: EMP Event ──
+    showIntroPanel('introP2');
+    soundEMP();
+
+    setTimeout(function() {
+      if (introSkipped) return;
+
+      // ── Panel 3: City Goes Dark ──
+      showIntroPanel('introP3');
+      buildCityScape();
+      soundCityDark();
+      setTimeout(flickerCityLights, 400);
+
+      setTimeout(function() {
+        if (introSkipped) return;
+
+        // ── Panel 4: Title Card ──
+        showIntroPanel('introP4');
+        soundTitleSlam();
+
+        setTimeout(function() {
+          if (introSkipped) return;
+          finishIntro(onComplete);
+        }, 3500);
+
+      }, 3000); // panel 3 duration
+    }, 3000);   // panel 2 duration
+  }, 2500);     // panel 1 duration
+}
+
+function finishIntro(onComplete) {
+  var introEl = document.getElementById('introScreen');
+  introEl.style.animation  = 'introPanelOut 0.5s ease forwards';
+  introEl.style.transition = 'opacity 0.5s ease';
+  introEl.style.opacity    = '0';
+  setTimeout(function() {
+    introEl.style.display = 'none';
+    onComplete();
+  }, 500);
+}
+
+// ════════════════════════════════════════════
 //  ACHIEVEMENT SYSTEM
 // ════════════════════════════════════════════
 
@@ -2652,31 +3013,34 @@ function toggleMute() {
 //  INIT
 // ════════════════════════════════════════════
 window.onload = function() {
-  runBoot(function() {
-    // Try to load saved character
-    try {
-      var savedChar = localStorage.getItem('sq_char');
-      if (savedChar) { character = JSON.parse(savedChar); }
-    } catch(e) {}
+  // Load character and achievements first
+  try {
+    var savedChar = localStorage.getItem('sq_char');
+    if (savedChar) { character = JSON.parse(savedChar); }
+  } catch(e) {}
+  loadAchievements();
+  loadVisited();
 
-    var loaded = loadGame();
-    loadVisited();
-    loadAchievements();
+  var loaded = loadGame();
 
-    if (loaded) {
-      // Returning player — skip char select, go straight to game
-      document.getElementById('gameScreen').style.display = 'block';
-      setSceneByLocation(gameState.location);
-      updateHintButtons(gameState.location);
-      var helpEl = document.getElementById('helpCharName');
-      if (helpEl) helpEl.textContent = character.name;
-      document.getElementById('cmdInput').focus();
-    } else {
-      // New player — show character select
-      soundBoot();
-      document.getElementById('charScreen').style.display = 'flex';
-    }
-  });
+  if (loaded) {
+    // Returning player — skip intro and boot, go straight to game
+    document.getElementById('introScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display  = 'block';
+    setSceneByLocation(gameState.location);
+    updateHintButtons(gameState.location);
+    var helpEl = document.getElementById('helpCharName');
+    if (helpEl) helpEl.textContent = character.name;
+    document.getElementById('cmdInput').focus();
+  } else {
+    // New player — play intro → boot → char select
+    runIntro(function() {
+      runBoot(function() {
+        soundBoot();
+        document.getElementById('charScreen').style.display = 'flex';
+      });
+    });
+  }
 };
 
 document.getElementById('goBtn').addEventListener('click', sendCommand);
