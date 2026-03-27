@@ -358,16 +358,21 @@
     ═══════════════════════════════ */
     .screen-footer {
       background: #000;
-      border-top: 1px solid #111;
+      border-top: 1px solid #1a1a1a;
       padding: 5px 12px;
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
+      gap: 4px;
     }
 
-    .footer-txt { font-size: 0.62em; color: #777; letter-spacing: 1px; }
-    .footer-save { font-size: 0.62em; color: var(--green-dim); letter-spacing: 1px; cursor: pointer; }
+    .footer-txt  { font-size: 0.62em; color: #888; letter-spacing: 1px; flex: 1; min-width: 120px; }
+    .footer-save { font-size: 0.64em; color: var(--green-dim); letter-spacing: 1px; cursor: pointer; white-space: nowrap; padding: 2px 4px; }
     .footer-save:hover { color: var(--green); }
+
+    /* Footer action group — keeps buttons together */
+    .footer-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
 
     /* ═══════════════════════════════
        BOOT SCREEN
@@ -422,8 +427,8 @@
     }
 
     .death-cause {
-      color: #555;
-      font-size: 0.65em;
+      color: #888;
+      font-size: 0.68em;
       letter-spacing: 1px;
       margin-bottom: 20px;
       font-style: italic;
@@ -527,23 +532,22 @@
     .t-narrator { color: var(--green); text-shadow: 0 0 4px var(--green-glow); }
     .t-err      { color: var(--red); }
     .t-wait     { color: var(--green-dim); font-style: italic; }
-    .t-system   { color: #777; font-size: 0.8em; letter-spacing: 1px; }
-    .t-hint     { color: #4a8a4a; font-size: 0.75em; font-style: italic; }
+    .t-system   { color: #999; font-size: 0.82em; letter-spacing: 1px; }
+    .t-hint     { color: #7aba7a; font-size: 0.76em; font-style: italic; }
     .t-tutorial {
-      color: #3a6a3a;
-      font-size: 0.72em;
+      color: #7aba7a;
+      font-size: 0.76em;
       font-style: italic;
       letter-spacing: 0.5px;
       line-height: 1.6;
       display: block;
-      border-left: 2px solid #2a4a2a;
+      border-left: 2px solid var(--green-dim);
       padding-left: 8px;
       animation: tutorialFade 1s ease 1s both;
     }
     .t-tutorial-cmd {
-      color: var(--green-dim);
+      color: var(--green);
       font-style: normal;
-      font-weight: bold;
       letter-spacing: 1px;
     }
     @keyframes tutorialFade {
@@ -768,12 +772,12 @@
     }
 
     .limit-divider {
-      color: #333;
-      font-size: 0.6em;
+      color: #777;
+      font-size: 0.62em;
       letter-spacing: 3px;
       width: 100%;
-      border-top: 1px solid #111;
-      border-bottom: 1px solid #111;
+      border-top: 1px solid #333;
+      border-bottom: 1px solid #333;
       padding: 6px 0;
     }
 
@@ -924,7 +928,7 @@
 
     .leg-current { color: var(--green); }
     .leg-visited  { color: var(--green-dim); }
-    .leg-unknown  { color: #3a5a3a; }
+    .leg-unknown  { color: #557755; }
 
     .map-grid {
       flex: 1;
@@ -943,22 +947,22 @@
     .map-cell {
       width: 52px;
       height: 36px;
-      border: 1px solid #0d200d;
+      border: 1px solid #1a3a1a;
       background: #000800;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 0.55em;
+      font-size: 0.58em;
       letter-spacing: 0.5px;
-      color: #1a3a1a;
+      color: #557755;
       transition: all 0.3s ease;
       position: relative;
     }
 
     .map-cell.unknown {
-      color: #3a5a3a;
-      border-color: #1a3a1a;
+      color: #669966;
+      border-color: #2a5a2a;
     }
 
     .map-cell.visited {
@@ -984,7 +988,7 @@
     .map-cell.connector {
       border: none;
       background: transparent;
-      color: #1a3a1a;
+      color: #557755;
       font-size: 0.7em;
     }
 
@@ -1010,11 +1014,11 @@
 
     .map-footer {
       text-align: center;
-      font-size: 0.58em;
-      color: #555;
+      font-size: 0.6em;
+      color: #777;
       letter-spacing: 2px;
       font-style: italic;
-      border-top: 1px solid #1a3a1a;
+      border-top: 1px solid #2a4a2a;
       padding-top: 8px;
     }
 
@@ -1402,7 +1406,7 @@
       <div class="header-badges">
         <div class="badge" id="scoreBadge" style="color:var(--amber);border-color:var(--amber-dim);">0 PTS</div>
         <div class="badge live">&#9679; LIVE</div>
-        <div class="badge" id="versionBadge">v3.0</div>
+        <div class="badge" id="versionBadge">v1.0</div>
       </div>
     </div>
 
@@ -1410,7 +1414,7 @@
     <div id="helpOverlay">
       <div class="help-title">&#9673; HOW TO PLAY</div>
       <div class="help-body">
-        You are <span id="helpCharName">your survivor</span> — stranded in your apartment after a
+        You are <span id="helpCharName">a survivor</span> — stranded in your apartment after a
         citywide blackout. Your goal: survive the commute home —
         reach your family in the suburbs
         <span>15 miles away</span>. You have <span>7 days</span> before
@@ -1430,13 +1434,13 @@
     </div>
 
     <!-- DAY MILESTONE BANNER -->
-    <div id="dayBanner">
+    <div id="dayBanner" style="display:none;">
       <span class="banner-day" id="bannerDay">DAY 2</span>
       <span class="banner-msg" id="bannerMsg">The city is waking up to reality.</span>
     </div>
 
     <!-- SCORE NOTIFICATION -->
-    <div id="scoreNotif">+0 PTS</div>
+    <div id="scoreNotif" style="display:none;">+0 PTS</div>
 
     <!-- MAP OVERLAY -->
     <div id="mapOverlay">
@@ -1452,7 +1456,7 @@
       <div class="map-grid" id="mapGrid">
         <!-- injected by JS -->
       </div>
-      <div class="map-footer">PAPER MAP — HAND DRAWN — PROBABLY WRONG</div>
+      <div class="map-footer">CITY GRID — ESTIMATED DAY 1 ROUTES</div>
     </div>
 
     <!-- INTRO CINEMATIC -->
@@ -1698,10 +1702,12 @@
       <!-- FOOTER -->
       <div class="screen-footer">
         <div class="footer-txt" id="footerSector">&#9608; DARK COMMUTE &nbsp;|&nbsp; BLACKOUT DAY 1</div>
-        <div class="footer-save" id="turnCounter" onclick="onTurnCounterClick()" title="Daily turns remaining" style="color:var(--green-dim);cursor:pointer;">&#9632; 20 LEFT</div>
-        <div class="footer-save" onclick="clearSave()" title="Reset game">&#9673; RESET</div>
-        <div class="footer-save" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#9834; SFX ON</div>
-        <div class="footer-save" onclick="toggleMap()" title="Toggle map">&#9638; MAP</div>
+        <div class="footer-actions">
+          <div class="footer-save" id="turnCounter" onclick="onTurnCounterClick()" title="Daily turns remaining">&#9632; 20 LEFT</div>
+          <div class="footer-save" onclick="safeReset()" title="Reset game">&#9673; RESET</div>
+          <div class="footer-save" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#9834; SFX ON</div>
+          <div class="footer-save" onclick="toggleMap()" title="Toggle map">&#9638; MAP</div>
+        </div>
       </div>
     </div>
 
@@ -2156,7 +2162,6 @@ function checkTensionAudio() {
 }
 
 // ── Toggle ambient with mute ───────────────
-// Override toggleMute to also handle ambient
 function toggleMute() {
   audioEnabled = !audioEnabled;
   document.getElementById('muteBtn').textContent =
@@ -2165,7 +2170,19 @@ function toggleMute() {
     stopAmbient();
     stopHeartbeat();
   } else {
-    startAmbient(gameState.location);
+    // Resume AudioContext if browser suspended it
+    try {
+      var ctx = getAudioCtx();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().then(function() {
+          startAmbient(gameState.location);
+        });
+      } else {
+        startAmbient(gameState.location);
+      }
+    } catch(e) {
+      startAmbient(gameState.location);
+    }
   }
 }
 
@@ -3878,8 +3895,10 @@ function updatePortrait() {
   artEl.textContent = frames.join('\n');
   artEl.className   = 'portrait-art state-' + state;
 
-  // Update name
-  if (nameEl) nameEl.textContent = character.name || '—';
+  // Update name — use character name or friendly default
+  if (nameEl) nameEl.textContent = (character.name && character.name !== 'ALEX' || gameState.day > 1)
+    ? character.name
+    : character.name || '—';
 
   // Update status
   if (statusEl) {
@@ -4061,8 +4080,33 @@ function tryUnlock() {
   }
 }
 
+var resetPending = false;
+var resetTimer   = null;
+
+function safeReset() {
+  if (!resetPending) {
+    resetPending = true;
+    var btn = document.querySelector('[onclick="safeReset()"]');
+    if (btn) {
+      btn.textContent  = '⚠ CONFIRM?';
+      btn.style.color  = 'var(--red)';
+    }
+    resetTimer = setTimeout(function() {
+      resetPending = false;
+      var b = document.querySelector('[onclick="safeReset()"]');
+      if (b) {
+        b.textContent = '◉ RESET';
+        b.style.color = '';
+      }
+    }, 2500);
+  } else {
+    clearTimeout(resetTimer);
+    resetPending = false;
+    clearSave();
+  }
+}
+
 function showFullVersionBadge() {
-  // Add ★ FULL badge to header if not already there
   var badges = document.getElementById('versionBadge');
   if (badges) {
     badges.textContent = '★ FULL';
@@ -4416,6 +4460,15 @@ document.getElementById('cmdInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') { sendCommand(); }
   else if (e.key.length === 1) { soundKey(); }
 });
+
+// Resume AudioContext on first tap anywhere (browser policy)
+document.addEventListener('click', function resumeAudio() {
+  try {
+    var ctx = getAudioCtx();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+  } catch(e) {}
+  document.removeEventListener('click', resumeAudio);
+}, { once: true });
 </script>
 </body>
 </html>
