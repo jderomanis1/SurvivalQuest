@@ -4779,6 +4779,8 @@ function launchDreamSequence(triggerType) {
   goBtn.disabled = true;
 
   var dreamActive = { value: true };
+  var dreamAudio = initDreamAudio();
+  dreamAudioRef = dreamAudio;
 
   fetchDreamIntro(triggerType, function(introText) {
     triggerDreamTransition(introText, function() {
@@ -4787,11 +4789,25 @@ function launchDreamSequence(triggerType) {
       spawnDreamEnemies(dreamScene.scene);
       var shooting = initDreamShooting(dreamScene.scene, dreamScene.camera, dreamEnemies, dreamActive);
 
+      dreamAudio.startDrone();
+
       // Inject enemy + control updates into the render loop
       function dreamLoop() {
         if (!dreamActive.value) return;
         dreamScene.animationId = requestAnimationFrame(dreamLoop);
         controls.update();
+
+        // Check for nearby enemies for warning sound
+        var anyClose = false;
+        for (var ei = 0; ei < dreamEnemies.length; ei++) {
+          if (dreamEnemies[ei].alive && dreamEnemies[ei].mesh.position.z > -5) {
+            anyClose = true;
+            break;
+          }
+        }
+        if (anyClose) dreamAudio.startWarning();
+        else dreamAudio.stopWarning();
+
         updateDreamEnemies(dreamScene.scene, dreamScene.camera, function() {
           // Early exit — player overwhelmed
           dreamActive.value = false;
@@ -4805,7 +4821,7 @@ function launchDreamSequence(triggerType) {
       cancelAnimationFrame(dreamScene.animationId);
       dreamLoop();
 
-      runDreamTimer(function(outcome) {
+      runDreamTimer(dreamAudio, function(outcome) {
         dreamActive.value = false;
         cleanupDream(outcome);
       });
@@ -4818,6 +4834,11 @@ function launchDreamSequence(triggerType) {
         cancelAnimationFrame(dreamScene.animationId);
         controls.cleanup();
         shooting.cleanup();
+        dreamAudio.stopDrone();
+        dreamAudio.stopWarning();
+        dreamAudio.playSnapBack();
+        dreamAudio.cleanup();
+        dreamAudioRef = null;
         dreamScene.renderer.dispose();
 
         fetchDreamDebrief(outcome, function(debriefText) {
@@ -5066,6 +5087,7 @@ function initDreamControls(camera, dreamActive) {
 var dreamEnemies = [];
 var dreamHealth = 100;
 var dreamKillCount = 0;
+var dreamAudioRef = null;
 
 function createEnemyMesh() {
   var group = new THREE.Group();
@@ -5122,6 +5144,7 @@ function flashHit() {
   var el = document.getElementById('dreamHitFlash');
   el.classList.add('active');
   setTimeout(function() { el.classList.remove('active'); }, 200);
+  if (dreamAudioRef) dreamAudioRef.playPlayerHit();
 }
 
 function updateDreamEnemies(scene, camera, onDreamFail) {
@@ -5210,6 +5233,7 @@ function initDreamShooting(scene, camera, enemies, dreamActive) {
             scene.remove(enemies[j].mesh);
             dreamKillCount++;
             document.getElementById('killCount').textContent = dreamKillCount;
+            if (dreamAudioRef) dreamAudioRef.playGlitchHit();
             break;
           }
         }
@@ -5278,7 +5302,7 @@ function endDreamEarly(onComplete) {
   }, 1000);
 }
 
-function runDreamTimer(onComplete) {
+function runDreamTimer(dreamAudio, onComplete) {
   var remaining = 60;
   var timerEl = document.getElementById('dreamTimerCount');
   var timerLabel = document.getElementById('dreamTimerLabel');
@@ -5290,6 +5314,10 @@ function runDreamTimer(onComplete) {
   dreamTimerInterval = setInterval(function() {
     remaining--;
     timerEl.textContent = remaining;
+
+    if (remaining <= 10 && remaining > 0 && dreamAudio) {
+      dreamAudio.playTimerBeep();
+    }
 
     if (remaining <= 5) {
       timerEl.classList.add('pulse');
@@ -5443,6 +5471,195 @@ function applyDreamOutcome(outcome) {
     }
     applyState();
   }
+}
+
+// ════════════════════════════════════════════
+//  DREAM AUDIO — WEB AUDIO API
+// ════════════════════════════════════════════
+function initDreamAudio() {
+  var ctx = null;
+  var droneOsc = null;
+  var droneGain = null;
+  var warningOsc = null;
+  var warningGain = null;
+  var warningOn = false;
+  var warningPulseInterval = null;
+  var active = false;
+
+  function ensureCtx() {
+    if (!ctx) {
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e) { return false; }
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return true;
+  }
+
+  function canPlay() {
+    return audioEnabled && ensureCtx();
+  }
+
+  // ── Ambient drone ──
+  function startDrone() {
+    if (!canPlay()) return;
+    droneOsc = ctx.createOscillator();
+    droneOsc.type = 'sawtooth';
+    droneOsc.frequency.value = 55;
+
+    var filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 400;
+
+    droneGain = ctx.createGain();
+    droneGain.gain.setValueAtTime(0, ctx.currentTime);
+    droneGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 2);
+
+    droneOsc.connect(filter);
+    filter.connect(droneGain);
+    droneGain.connect(ctx.destination);
+    droneOsc.start();
+    active = true;
+  }
+
+  function stopDrone() {
+    if (droneOsc && droneGain) {
+      try {
+        droneGain.gain.cancelScheduledValues(ctx.currentTime);
+        droneGain.gain.setValueAtTime(droneGain.gain.value, ctx.currentTime);
+        droneGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
+        droneOsc.stop(ctx.currentTime + 1.1);
+      } catch(e) {}
+    }
+    droneOsc = null;
+    droneGain = null;
+  }
+
+  // ── Glitch hit (enemy kill) ──
+  function playGlitchHit() {
+    if (!canPlay()) return;
+    var bufSize = Math.floor(ctx.sampleRate * 0.08);
+    var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = 0.5 + Math.random() * 1.5;
+
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.25, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+
+    src.connect(g);
+    g.connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + 0.1);
+  }
+
+  // ── Enemy approach warning ──
+  function startWarning() {
+    if (warningOn || !canPlay()) return;
+    warningOn = true;
+    warningOsc = ctx.createOscillator();
+    warningOsc.type = 'square';
+    warningOsc.frequency.value = 220;
+    warningGain = ctx.createGain();
+    warningGain.gain.value = 0;
+
+    warningOsc.connect(warningGain);
+    warningGain.connect(ctx.destination);
+    warningOsc.start();
+
+    var pulseState = false;
+    warningPulseInterval = setInterval(function() {
+      if (!warningGain) return;
+      pulseState = !pulseState;
+      try { warningGain.gain.setValueAtTime(pulseState ? 0.03 : 0, ctx.currentTime); }
+      catch(e) {}
+    }, 300);
+  }
+
+  function stopWarning() {
+    warningOn = false;
+    if (warningPulseInterval) { clearInterval(warningPulseInterval); warningPulseInterval = null; }
+    if (warningOsc) {
+      try { warningOsc.stop(); } catch(e) {}
+      warningOsc = null;
+    }
+    warningGain = null;
+  }
+
+  // ── Player hit (low boom) ──
+  function playPlayerHit() {
+    if (!canPlay()) return;
+    var osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 80;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.3, ctx.currentTime);
+    g.gain.setValueAtTime(0.3, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  }
+
+  // ── Timer beep (final 10s) ──
+  function playTimerBeep() {
+    if (!canPlay()) return;
+    var osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.15, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.06);
+  }
+
+  // ── Snap-back (white noise burst) ──
+  function playSnapBack() {
+    if (!canPlay()) return;
+    var bufSize = Math.floor(ctx.sampleRate * 0.2);
+    var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.3, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+
+    src.connect(g);
+    g.connect(ctx.destination);
+    src.start();
+    src.stop(ctx.currentTime + 0.25);
+  }
+
+  // ── Cleanup ──
+  function cleanup() {
+    active = false;
+    stopDrone();
+    stopWarning();
+  }
+
+  return {
+    startDrone: startDrone,
+    stopDrone: stopDrone,
+    playGlitchHit: playGlitchHit,
+    startWarning: startWarning,
+    stopWarning: stopWarning,
+    playPlayerHit: playPlayerHit,
+    playTimerBeep: playTimerBeep,
+    playSnapBack: playSnapBack,
+    cleanup: cleanup
+  };
 }
 </script>
 </body>
