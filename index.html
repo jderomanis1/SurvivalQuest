@@ -5229,6 +5229,133 @@ function runDreamTimer(onComplete) {
     }
   }, 1000);
 }
+
+// ════════════════════════════════════════════
+//  DREAM NARRATIVE — CLAUDE INTRO & DEBRIEF
+// ════════════════════════════════════════════
+var dreamIntroFallbacks = {
+  morale:   'The mind breaks before the body does.',
+  artifact: 'The signal was always listening.',
+  day7:     'Day seven. The city shows you what it really is.',
+  code:     'You called. Something answered.'
+};
+
+function fetchDreamIntro(triggerType, callback) {
+  var fallback = dreamIntroFallbacks[triggerType] || dreamIntroFallbacks.code;
+  var body = JSON.stringify({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 80,
+    system: 'You write horror-adjacent survival game narration. Terse. Visceral. Never explain — only show.',
+    messages: [{
+      role: 'user',
+      content: 'You are the narrator of Dark Commute, a survival game. ' +
+        'The player has experienced a psychic break triggered by: ' + triggerType + '. ' +
+        'Write 2–3 lines of fragmentary, visceral narrative describing their mind ' +
+        'fracturing and the city dreamscape bleeding through. ' +
+        'Dark, cinematic, present tense. Max 30 words. ' +
+        'No quotation marks. Start with a short punchy sentence. ' +
+        'Examples of tone: ' +
+        '"The signal finds the cracks first." ' +
+        '"Something that is not the city reaches back."'
+    }]
+  });
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/.netlify/functions/claude', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.timeout = 3000;
+
+  var done = false;
+  function finish(text) {
+    if (done) return;
+    done = true;
+    callback(text);
+  }
+
+  xhr.onload = function() {
+    try {
+      var data = JSON.parse(xhr.responseText);
+      if (data.content && data.content[0] && data.content[0].text) {
+        finish(data.content[0].text.trim());
+      } else {
+        finish(fallback);
+      }
+    } catch(e) {
+      finish(fallback);
+    }
+  };
+  xhr.onerror = function() { finish(fallback); };
+  xhr.ontimeout = function() { finish(fallback); };
+
+  try {
+    xhr.send(body);
+  } catch(e) {
+    finish(fallback);
+  }
+}
+
+function fetchDreamDebrief(outcome, callback) {
+  var fallback = 'The city lets you back. For now.';
+  var body = JSON.stringify({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 60,
+    system: 'You write horror survival game narration. Terse. Never explain.',
+    messages: [{
+      role: 'user',
+      content: 'Dark Commute survival game. Player just emerged from a 60-second ' +
+        'psychic combat sequence in a destroyed city dreamscape. ' +
+        'Result: ' + (outcome.survived ? 'Survived' : 'Overwhelmed') +
+        ', ' + outcome.kills + ' threats neutralized. ' +
+        'Write 1–2 sentences that the narrator delivers as they return to the terminal. ' +
+        'Tone: haunted, matter-of-fact. Max 20 words.'
+    }]
+  });
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/.netlify/functions/claude', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.timeout = 3000;
+
+  var done = false;
+  function finish(text) {
+    if (done) return;
+    done = true;
+    callback(text);
+  }
+
+  xhr.onload = function() {
+    try {
+      var data = JSON.parse(xhr.responseText);
+      if (data.content && data.content[0] && data.content[0].text) {
+        finish(data.content[0].text.trim());
+      } else {
+        finish(fallback);
+      }
+    } catch(e) {
+      finish(fallback);
+    }
+  };
+  xhr.onerror = function() { finish(fallback); };
+  xhr.ontimeout = function() { finish(fallback); };
+
+  try {
+    xhr.send(body);
+  } catch(e) {
+    finish(fallback);
+  }
+}
+
+function applyDreamOutcome(outcome) {
+  if (outcome.statBonus) {
+    if (outcome.statBonus.morale) {
+      gameState.morale = Math.max(0, Math.min(100, (gameState.morale || 50) + outcome.statBonus.morale));
+    }
+    if (outcome.statBonus.energy) {
+      gameState.energy = Math.max(0, Math.min(100, (gameState.energy || 50) + outcome.statBonus.energy));
+    }
+    applyState();
+  }
+}
 </script>
 </body>
 </html>
