@@ -1539,6 +1539,15 @@
       opacity: 1;
     }
 
+    @keyframes dreamTimerPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    #dreamTimerCount.pulse {
+      animation: dreamTimerPulse 0.4s infinite;
+    }
+
     @keyframes dreamGlitch {
       0%   { filter: none; }
       20%  { filter: hue-rotate(90deg) brightness(2); transform: skewX(5deg); }
@@ -5139,6 +5148,86 @@ function initDreamShooting(scene, camera, enemies, dreamActive) {
   }
 
   return { cleanup: cleanup };
+}
+
+// ════════════════════════════════════════════
+//  DREAM TIMER & OUTCOME
+// ════════════════════════════════════════════
+var dreamTimerInterval = null;
+
+function buildDreamOutcome() {
+  var survived = dreamHealth > 0;
+  var statBonus;
+  if (survived && dreamKillCount >= 4) {
+    statBonus = { morale: 20, energy: 15, message: 'The signal strengthened you.' };
+  } else if (survived) {
+    statBonus = { morale: 10, energy: 5, message: 'You endured.' };
+  } else {
+    statBonus = { morale: -15, energy: -10, message: 'The signal broke something in you.' };
+  }
+  return {
+    survived: survived,
+    kills: dreamKillCount,
+    healthRemaining: dreamHealth,
+    statBonus: statBonus
+  };
+}
+
+function endDreamEarly(onComplete) {
+  if (dreamTimerInterval) {
+    clearInterval(dreamTimerInterval);
+    dreamTimerInterval = null;
+  }
+  var msg = document.getElementById('dreamMessage');
+  msg.textContent = 'OVERWHELMED';
+  msg.style.opacity = '1';
+  setTimeout(function() {
+    msg.style.opacity = '0';
+    var outcome = buildDreamOutcome();
+    endDreamTransition(function() {
+      if (onComplete) onComplete(outcome);
+    });
+  }, 1000);
+}
+
+function runDreamTimer(onComplete) {
+  var remaining = 60;
+  var timerEl = document.getElementById('dreamTimerCount');
+  var timerLabel = document.getElementById('dreamTimerLabel');
+  timerEl.textContent = remaining;
+  timerEl.classList.remove('pulse');
+  timerEl.style.color = '';
+  timerLabel.style.color = '';
+
+  dreamTimerInterval = setInterval(function() {
+    remaining--;
+    timerEl.textContent = remaining;
+
+    if (remaining <= 5) {
+      timerEl.classList.add('pulse');
+    } else if (remaining <= 10) {
+      timerEl.style.color = '#ffaa00';
+      timerLabel.style.color = '#ffaa00';
+      timerEl.style.textShadow = '0 0 10px #ffaa00';
+    }
+
+    if (remaining <= 0) {
+      clearInterval(dreamTimerInterval);
+      dreamTimerInterval = null;
+      timerEl.classList.remove('pulse');
+
+      var msg = document.getElementById('dreamMessage');
+      msg.textContent = 'SIGNAL FADING';
+      msg.style.opacity = '1';
+      setTimeout(function() {
+        msg.style.opacity = '0';
+        var outcome = buildDreamOutcome();
+        endDreamTransition(function() {
+          if (onComplete) onComplete(outcome);
+        });
+      }, 1500);
+    }
+  }, 1000);
 }
 </script>
 </body>
