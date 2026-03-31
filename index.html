@@ -2430,7 +2430,7 @@ function selectChar(name, subject, object, possessive) {
   startAmbient(gameState.location);
   updatePortrait();
   initTutorial();
-  document.getElementById('cmdInput').focus();
+  document.getElementById('cmdInput').focus({ preventScroll: true });
 }
 
 // Tracks pending pronoun choice for custom form
@@ -2445,7 +2445,7 @@ function showCustomChar() {
   });
   document.querySelector('.char-options').style.display = 'none';
   document.querySelector('.char-subtitle').textContent  = 'CREATE YOUR SURVIVOR';
-  document.getElementById('customName').focus();
+  document.getElementById('customName').focus({ preventScroll: true });
 }
 
 function selectPronoun(subject, object, possessive, btn) {
@@ -3869,7 +3869,7 @@ function addLine(html, cls) {
   if (cls) span.className = cls;
   span.innerHTML = html;
   s.appendChild(span);
-  s.scrollTop = s.scrollHeight;
+  requestAnimationFrame(function(){ s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' }); });
 }
 
 // Remove old trailing cursor before adding new content
@@ -4511,7 +4511,7 @@ function triggerEasterEgg(cmd, egg) {
     input.disabled = false;
     goBtn.disabled = false;
     setQuickActionsDisabled(false);
-    input.focus();
+    input.focus({ preventScroll: true });
   }, 400);
 }
 
@@ -4564,7 +4564,7 @@ function sendCommand() {
   waitEl.className = 't-wait';
   waitEl.textContent = 'processing.';
   document.getElementById('story').appendChild(waitEl);
-  document.getElementById('story').scrollTop = 99999;
+  requestAnimationFrame(function(){ var s = document.getElementById('story'); s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' }); });
 
   var dotCount = 0;
   var dotInterval = setInterval(function() {
@@ -4583,8 +4583,8 @@ function sendCommand() {
     input.disabled = false;
     goBtn.disabled = false;
     setQuickActionsDisabled(false);
-    input.focus();
-    document.getElementById('story').scrollTop = 99999;
+    input.focus({ preventScroll: true });
+    requestAnimationFrame(function(){ var s = document.getElementById('story'); s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' }); });
     saveGame();
   }
 
@@ -4698,7 +4698,7 @@ window.onload = function() {
     initTutorial(); // will disable itself for returning players
     var helpEl = document.getElementById('helpCharName');
     if (helpEl) helpEl.textContent = character.name;
-    document.getElementById('cmdInput').focus();
+    document.getElementById('cmdInput').focus({ preventScroll: true });
   } else {
     // New player — play intro → boot → char select
     runIntro(function() {
@@ -4848,7 +4848,7 @@ function launchDreamSequence(triggerType) {
           cmdInput.disabled = false;
           goBtn.disabled = false;
           setQuickActionsDisabled(false);
-          cmdInput.focus();
+          cmdInput.focus({ preventScroll: true });
         });
       }
     });
