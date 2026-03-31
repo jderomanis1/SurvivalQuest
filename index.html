@@ -1525,6 +1525,32 @@
       animation: pulse 1.5s infinite;
     }
 
+    @keyframes dreamGlitch {
+      0%   { filter: none; }
+      20%  { filter: hue-rotate(90deg) brightness(2); transform: skewX(5deg); }
+      40%  { filter: hue-rotate(180deg) brightness(0.3); transform: skewX(-3deg); }
+      60%  { filter: hue-rotate(270deg) brightness(3); transform: skewX(2deg); }
+      80%  { filter: brightness(0); }
+      100% { filter: brightness(0); }
+    }
+
+    .crt.glitching {
+      animation: dreamGlitch 0.8s forwards;
+    }
+
+    @keyframes dreamFlashOut {
+      0%   { background: #fff; }
+      20%  { background: #000; }
+      40%  { background: #fff; }
+      60%  { background: #000; }
+      80%  { background: #fff; }
+      100% { background: #000; }
+    }
+
+    #dreamOverlay.flash-out {
+      animation: dreamFlashOut 0.6s forwards;
+    }
+
   </style>
 </head>
 <body>
@@ -4656,6 +4682,43 @@ document.addEventListener('click', function resumeAudio() {
   } catch(e) {}
   document.removeEventListener('click', resumeAudio);
 }, { once: true });
+
+// ════════════════════════════════════════════
+//  DREAM SEQUENCE TRANSITIONS
+// ════════════════════════════════════════════
+function triggerDreamTransition(introText, callback) {
+  var crt = document.querySelector('.crt');
+
+  // Phase 1 — Screen glitch (0–800ms)
+  crt.classList.add('glitching');
+
+  setTimeout(function() {
+    // Phase 2 — Show intro (800ms–3500ms)
+    document.getElementById('dreamOverlay').style.display = 'flex';
+    document.getElementById('dreamIntro').style.display = 'flex';
+    document.getElementById('dreamIntroText').textContent = introText;
+
+    setTimeout(function() {
+      // Phase 3 — Launch 3D (3500ms)
+      document.getElementById('dreamIntro').style.display = 'none';
+      document.getElementById('dreamHUD').style.display = 'block';
+      crt.classList.remove('glitching');
+      if (callback) callback();
+    }, 2700);
+  }, 800);
+}
+
+function endDreamTransition(callback) {
+  var overlay = document.getElementById('dreamOverlay');
+  overlay.classList.add('flash-out');
+
+  setTimeout(function() {
+    overlay.classList.remove('flash-out');
+    overlay.style.display = 'none';
+    document.getElementById('dreamHUD').style.display = 'none';
+    if (callback) callback();
+  }, 600);
+}
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </body>
