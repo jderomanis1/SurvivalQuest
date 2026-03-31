@@ -4399,6 +4399,7 @@ function sendCommand() {
         var raw = data.content[0].text;
         chatLog.push({ role: 'assistant', content: raw });
         var parsed = parseResponse(raw);
+        if (parsed.day && parsed.day > (gameState.day || 1)) checkDayPoints(parsed.day);
         applyParsed(parsed);
         if (el) el.remove();
         soundResponse();
@@ -4406,7 +4407,6 @@ function sendCommand() {
         checkAchievements(parsed);
         handleClaudePoints(parsed);
         checkTutorial(parsed);
-        if (parsed.day && parsed.day > (gameState.day || 1)) checkDayPoints(parsed.day);
         if (!checkGameOver(parsed)) {
           addLine(parsed.narration + '<br><span class="cursor"></span>', 't-narrator');
         }
