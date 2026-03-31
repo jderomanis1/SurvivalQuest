@@ -1525,6 +1525,20 @@
       animation: pulse 1.5s infinite;
     }
 
+    #dreamHitFlash {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 0, 0, 0.2);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 5;
+    }
+
+    #dreamHitFlash.active {
+      opacity: 1;
+    }
+
     @keyframes dreamGlitch {
       0%   { filter: none; }
       20%  { filter: hue-rotate(90deg) brightness(2); transform: skewX(5deg); }
@@ -1945,6 +1959,8 @@
         <div id="dreamCrosshair">+</div>
         <div id="dreamMessage"></div>
       </div>
+
+      <div id="dreamHitFlash"></div>
 
       <div id="dreamIntro">
         <div id="dreamIntroText"></div>
@@ -4945,6 +4961,184 @@ function initDreamControls(camera, dreamActive) {
   }
 
   return { update: update, cleanup: cleanup };
+}
+
+// ════════════════════════════════════════════
+//  DREAM ENEMIES — CORRUPTED SHADOWS
+// ════════════════════════════════════════════
+var dreamEnemies = [];
+var dreamHealth = 100;
+var dreamKillCount = 0;
+
+function createEnemyMesh() {
+  var group = new THREE.Group();
+
+  // Body
+  var bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.4, 8);
+  var bodySolid = new THREE.Mesh(bodyGeo, new THREE.MeshBasicMaterial({ color: 0x330022 }));
+  var bodyWire = new THREE.Mesh(bodyGeo, new THREE.MeshBasicMaterial({ color: 0xff0066, wireframe: true }));
+  group.add(bodySolid);
+  group.add(bodyWire);
+
+  // Head
+  var headGeo = new THREE.SphereGeometry(0.25, 8, 6);
+  var headSolid = new THREE.Mesh(headGeo, new THREE.MeshBasicMaterial({ color: 0x330022 }));
+  headSolid.position.y = 0.95;
+  var headWire = new THREE.Mesh(headGeo, new THREE.MeshBasicMaterial({ color: 0xff0066, wireframe: true }));
+  headWire.position.y = 0.95;
+  group.add(headSolid);
+  group.add(headWire);
+
+  return group;
+}
+
+function spawnDreamEnemies(scene) {
+  dreamEnemies = [];
+  dreamHealth = 100;
+  dreamKillCount = 0;
+  document.getElementById('killCount').textContent = '0';
+
+  for (var i = 0; i < 6; i++) {
+    var mesh = createEnemyMesh();
+    var zPos = -8 - (i * 5.4);
+    mesh.position.set((Math.random() - 0.5) * 6, 0.9, zPos);
+    scene.add(mesh);
+    dreamEnemies.push({
+      mesh: mesh,
+      health: 1,
+      alive: true,
+      speed: 0.008 + Math.random() * 0.006
+    });
+  }
+}
+
+function respawnEnemy(enemy, scene) {
+  enemy.alive = true;
+  enemy.health = 1;
+  var mesh = createEnemyMesh();
+  mesh.position.set((Math.random() - 0.5) * 6, 0.9, -30 - Math.random() * 5);
+  scene.add(mesh);
+  enemy.mesh = mesh;
+}
+
+function flashHit() {
+  var el = document.getElementById('dreamHitFlash');
+  el.classList.add('active');
+  setTimeout(function() { el.classList.remove('active'); }, 200);
+}
+
+function updateDreamEnemies(scene, camera, onDreamFail) {
+  for (var i = 0; i < dreamEnemies.length; i++) {
+    var e = dreamEnemies[i];
+    if (!e.alive) continue;
+
+    e.mesh.position.z += e.speed;
+
+    if (e.mesh.position.z > 1.5) {
+      dreamHealth -= 25;
+      flashHit();
+      scene.remove(e.mesh);
+      if (dreamHealth <= 0) {
+        e.alive = false;
+        if (onDreamFail) onDreamFail();
+        return;
+      }
+      respawnEnemy(e, scene);
+    }
+  }
+}
+
+// ════════════════════════════════════════════
+//  DREAM SHOOTING
+// ════════════════════════════════════════════
+function initDreamShooting(scene, camera, enemies, dreamActive) {
+  var ammo = 10;
+  var maxAmmo = 10;
+  var raycaster = new THREE.Raycaster();
+  var center = new THREE.Vector2(0, 0);
+  var reloadInterval = null;
+
+  function updateAmmoDisplay() {
+    var filled = '';
+    var empty = '';
+    for (var i = 0; i < maxAmmo; i++) {
+      if (i < ammo) filled += '\u2B1B'; else empty += '\u2B1C';
+    }
+    document.getElementById('dreamAmmo').innerHTML =
+      filled + empty + ' AMMO: <span id="ammoCount">' + ammo + '</span>';
+  }
+
+  function flashCrosshair() {
+    var ch = document.getElementById('dreamCrosshair');
+    ch.style.color = '#ff0000';
+    setTimeout(function() { ch.style.color = 'rgba(255,255,255,0.6)'; }, 150);
+  }
+
+  function showMessage(text) {
+    var msg = document.getElementById('dreamMessage');
+    msg.textContent = text;
+    msg.style.opacity = '1';
+    setTimeout(function() { msg.style.opacity = '0'; }, 1000);
+  }
+
+  function onShoot(e) {
+    if (!dreamActive.value) return;
+    if (document.pointerLockElement !== document.getElementById('dreamCanvas')) return;
+
+    if (ammo <= 0) {
+      showMessage('NO AMMO');
+      return;
+    }
+
+    ammo--;
+    updateAmmoDisplay();
+    flashCrosshair();
+
+    raycaster.setFromCamera(center, camera);
+    var meshes = [];
+    for (var i = 0; i < enemies.length; i++) {
+      if (enemies[i].alive) {
+        meshes.push.apply(meshes, enemies[i].mesh.children);
+      }
+    }
+    var hits = raycaster.intersectObjects(meshes);
+    if (hits.length > 0) {
+      var hitObj = hits[0].object;
+      for (var j = 0; j < enemies.length; j++) {
+        if (!enemies[j].alive) continue;
+        var children = enemies[j].mesh.children;
+        for (var c = 0; c < children.length; c++) {
+          if (children[c] === hitObj) {
+            enemies[j].alive = false;
+            scene.remove(enemies[j].mesh);
+            dreamKillCount++;
+            document.getElementById('killCount').textContent = dreamKillCount;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  document.addEventListener('click', onShoot);
+
+  // Auto-reload: +2 every 8 seconds
+  reloadInterval = setInterval(function() {
+    if (!dreamActive.value) return;
+    if (ammo < maxAmmo) {
+      ammo = Math.min(maxAmmo, ammo + 2);
+      updateAmmoDisplay();
+    }
+  }, 8000);
+
+  updateAmmoDisplay();
+
+  function cleanup() {
+    document.removeEventListener('click', onShoot);
+    clearInterval(reloadInterval);
+  }
+
+  return { cleanup: cleanup };
 }
 </script>
 </body>
