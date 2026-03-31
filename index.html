@@ -3574,11 +3574,20 @@ function applyParsed(p) {
   }
 
   if (p.inventory !== null) {
+    var prevInventory = gameState.inventory.slice();
     if (p.inventory.toUpperCase() === 'NONE' || p.inventory === '') {
       gameState.inventory = [];
     } else {
       gameState.inventory = p.inventory.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
     }
+    var newItems = gameState.inventory.filter(function(item) {
+      return prevInventory.indexOf(item) === -1;
+    });
+    newItems.forEach(function(item) {
+      if (item.toLowerCase().indexOf('signal') !== -1) {
+        launchDreamSequence('artifact');
+      }
+    });
   }
 
   applyState();
