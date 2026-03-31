@@ -2640,6 +2640,8 @@ function setSceneByLocation(locationStr) {
 //  STATE
 // ════════════════════════════════════════════
 var chatLog = [];
+var dreamSequenceActive = false;
+var dreamSequenceUsed = { morale: false, artifact: false, day7: false };
 var gameState = {
   morale:    75,
   hunger:    80,
@@ -2686,6 +2688,7 @@ Goal: escape the city on foot and reach family in the suburbs, 15 miles away.
 - Bicycle: locked in basement (needs key from super's office or bolt cutters)
 - Paper city map: kitchen junk drawer
 - Water bottles: kitchen cabinet (2x 500ml)
+- Signal Artifact: occasionally (roughly 1 in 10 turns) when the situation is dramatic, include a 'Signal Artifact' in the player's found items
 - Neighbour Mrs. Chen 6B: elderly, resourceful, has hand-crank radio
 - College guys 6D: scared, have a useless car battery jump-starter
 
@@ -3763,6 +3766,9 @@ function applyParsed(p) {
 
   // Check for day change BEFORE updating state
   if (p.day && p.day > (gameState.day || 1)) {
+    if (p.day >= 7 && (gameState.day || 1) < 7) {
+      launchDreamSequence('day7');
+    }
     gameState.day = p.day;
     showDayBanner(p.day);
   } else if (p.day) {
@@ -3789,6 +3795,10 @@ function applyParsed(p) {
   applyState();
   checkTensionAudio();
   updatePortrait();
+
+  if (gameState.morale <= 15 && gameState.morale > 0) {
+    launchDreamSequence('morale');
+  }
 }
 
 // ════════════════════════════════════════════
@@ -4523,6 +4533,13 @@ function sendCommand() {
   removeCursor();
   addLine('<br>', '');
 
+  // ── Dream sequence secret code ──
+  if (val.toUpperCase() === 'SIGNAL OVERRIDE') {
+    addLine('&gt; ' + val + '<br>', 't-player');
+    launchDreamSequence('code');
+    return;
+  }
+
   // ── Easter egg intercept — before hitting Claude API ──
   var egg = checkEasterEgg(val);
   if (egg) {
@@ -4743,6 +4760,77 @@ function endDreamTransition(callback) {
     document.getElementById('dreamHUD').style.display = 'none';
     if (callback) callback();
   }, 600);
+}
+
+// ════════════════════════════════════════════
+//  DREAM SEQUENCE — CENTRAL LAUNCH
+// ════════════════════════════════════════════
+function launchDreamSequence(triggerType) {
+  if (dreamSequenceActive) return;
+  if (dreamSequenceUsed[triggerType] !== undefined && dreamSequenceUsed[triggerType]) return;
+  dreamSequenceActive = true;
+  if (dreamSequenceUsed[triggerType] !== undefined) {
+    dreamSequenceUsed[triggerType] = true;
+  }
+
+  var cmdInput = document.getElementById('cmdInput');
+  var goBtn = document.getElementById('goBtn');
+  cmdInput.disabled = true;
+  goBtn.disabled = true;
+
+  var dreamActive = { value: true };
+
+  fetchDreamIntro(triggerType, function(introText) {
+    triggerDreamTransition(introText, function() {
+      var dreamScene = buildDreamScene();
+      var controls = initDreamControls(dreamScene.camera, dreamActive);
+      spawnDreamEnemies(dreamScene.scene);
+      var shooting = initDreamShooting(dreamScene.scene, dreamScene.camera, dreamEnemies, dreamActive);
+
+      // Inject enemy + control updates into the render loop
+      function dreamLoop() {
+        if (!dreamActive.value) return;
+        dreamScene.animationId = requestAnimationFrame(dreamLoop);
+        controls.update();
+        updateDreamEnemies(dreamScene.scene, dreamScene.camera, function() {
+          // Early exit — player overwhelmed
+          dreamActive.value = false;
+          endDreamEarly(function(outcome) {
+            cleanupDream(outcome);
+          });
+        });
+        dreamScene.renderer.render(dreamScene.scene, dreamScene.camera);
+      }
+      // Stop the original loop started by buildDreamScene and replace it
+      cancelAnimationFrame(dreamScene.animationId);
+      dreamLoop();
+
+      runDreamTimer(function(outcome) {
+        dreamActive.value = false;
+        cleanupDream(outcome);
+      });
+
+      var dreamCleaned = false;
+      function cleanupDream(outcome) {
+        if (dreamCleaned) return;
+        dreamCleaned = true;
+        if (dreamTimerInterval) { clearInterval(dreamTimerInterval); dreamTimerInterval = null; }
+        cancelAnimationFrame(dreamScene.animationId);
+        controls.cleanup();
+        shooting.cleanup();
+        dreamScene.renderer.dispose();
+
+        fetchDreamDebrief(outcome, function(debriefText) {
+          addLine('<br>' + debriefText + '<br><span class="cursor"></span>', 't-narrator');
+          applyDreamOutcome(outcome);
+          dreamSequenceActive = false;
+          cmdInput.disabled = false;
+          goBtn.disabled = false;
+          cmdInput.focus();
+        });
+      }
+    });
+  });
 }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
