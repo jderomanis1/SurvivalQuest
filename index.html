@@ -4721,5 +4721,140 @@ function endDreamTransition(callback) {
 }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ════════════════════════════════════════════
+//  DREAM SEQUENCE — THREE.JS SCENE
+// ════════════════════════════════════════════
+function buildDreamScene() {
+  var canvas = document.getElementById('dreamCanvas');
+  var w = canvas.clientWidth || 600;
+  var h = canvas.clientHeight || 400;
+
+  // Renderer
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Scene
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0008);
+  scene.fog = new THREE.FogExp2(0x0a0008, 0.08);
+
+  // Camera
+  var camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 100);
+  camera.position.set(0, 1.6, 2);
+  camera.lookAt(0, 1.6, -10);
+
+  // ── Lighting ──
+  var ambient = new THREE.AmbientLight(0x110008, 0.3);
+  scene.add(ambient);
+
+  var dirLight = new THREE.DirectionalLight(0xff2200, 0.4);
+  dirLight.position.set(5, 10, 2);
+  scene.add(dirLight);
+
+  // Streetlights (flickering)
+  var streetLights = [];
+  var slPositions = [
+    [-5, 4, -8], [5, 4, -8],
+    [-5, 4, -24], [5, 4, -24]
+  ];
+  for (var i = 0; i < slPositions.length; i++) {
+    var sl = new THREE.PointLight(0xff6600, 1.5, 12);
+    sl.position.set(slPositions[i][0], slPositions[i][1], slPositions[i][2]);
+    scene.add(sl);
+    streetLights.push(sl);
+  }
+
+  // ── Ground ──
+  var groundGeo = new THREE.PlaneGeometry(80, 80);
+  var groundMat = new THREE.MeshLambertMaterial({ color: 0x1a0a1a });
+  var ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0;
+  scene.add(ground);
+
+  // ── Road markings ──
+  var markMat = new THREE.MeshLambertMaterial({ color: 0x332233 });
+  for (var m = 0; m < 3; m++) {
+    var mark = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 6), markMat);
+    mark.position.set(0, 0.01, -5 - m * 8);
+    scene.add(mark);
+  }
+
+  // ── Buildings ──
+  var buildMat = new THREE.MeshLambertMaterial({ color: 0x1a0a20 });
+  var winColors = [0xff3300, 0xffaa00];
+  var zPositions = [-5, -13, -21, -29];
+
+  for (var side = 0; side < 2; side++) {
+    var xSign = side === 0 ? -1 : 1;
+    for (var b = 0; b < 4; b++) {
+      var bw = 3 + Math.random() * 2;
+      var bh = 4 + Math.random() * 8;
+      var bd = 3 + Math.random() * 2;
+      var bx = xSign * (8 + Math.random() * 4);
+      var bz = zPositions[b];
+
+      var building = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), buildMat);
+      building.position.set(bx, bh / 2, bz);
+      scene.add(building);
+
+      // Glowing windows (2–3 per building)
+      var numWins = 2 + Math.floor(Math.random() * 2);
+      for (var wi = 0; wi < numWins; wi++) {
+        var winMat = new THREE.MeshBasicMaterial({ color: winColors[wi % 2] });
+        var win = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.05), winMat);
+        var wx = bx + (Math.random() - 0.5) * (bw * 0.6);
+        var wy = 1.5 + Math.random() * (bh - 3);
+        var wz = bz + (side === 0 ? bd / 2 + 0.03 : -bd / 2 - 0.03);
+        win.position.set(wx, wy, wz);
+        scene.add(win);
+      }
+    }
+  }
+
+  // ── Debris ──
+  var debrisMat = new THREE.MeshLambertMaterial({ color: 0x2a1a2a });
+  for (var d = 0; d < 12; d++) {
+    var ds = 0.3 + Math.random() * 0.9;
+    var debris = new THREE.Mesh(
+      new THREE.BoxGeometry(ds, ds * 0.6, ds),
+      debrisMat
+    );
+    debris.position.set(
+      (Math.random() - 0.5) * 10,
+      Math.random() * 0.5,
+      -(5 + Math.random() * 35)
+    );
+    debris.rotation.set(Math.random(), Math.random(), Math.random());
+    scene.add(debris);
+  }
+
+  // ── Render loop ──
+  var frameCount = 0;
+  var nextFlicker = 30 + Math.floor(Math.random() * 60);
+  var result = { scene: scene, camera: camera, renderer: renderer, animationId: null };
+
+  function animate() {
+    result.animationId = requestAnimationFrame(animate);
+    frameCount++;
+
+    // Flicker streetlights
+    if (frameCount >= nextFlicker) {
+      for (var li = 0; li < streetLights.length; li++) {
+        streetLights[li].intensity = 0.2 + Math.random() * 1.8;
+      }
+      nextFlicker = frameCount + 30 + Math.floor(Math.random() * 60);
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+
+  return result;
+}
+</script>
 </body>
 </html>
