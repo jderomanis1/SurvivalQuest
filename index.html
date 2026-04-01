@@ -1401,126 +1401,34 @@
 
       .game-title { font-size: 1.2em; letter-spacing: 3px; }
     }
-    /* ── Dream Sequence Overlay ── */
-    #dreamOverlay {
-      display: none;
-      position: absolute;
-      inset: 0;
-      z-index: 100;
-      background: #000;
-      overflow: hidden;
+    /* ── Dream Sequence — Reality Breach ── */
+    @keyframes dreamBgShift {
+      0%   { background-color: #0a0012; }
+      33%  { background-color: #120000; }
+      66%  { background-color: #000000; }
+      100% { background-color: #0a0012; }
     }
-
-    #dreamVignette {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.8) 100%);
-      z-index: 2;
+    @keyframes dreamBreathe {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.02); }
     }
-
-    #dreamField {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      /* Play area for 2D tap-target fragments — Prompt 4 */
+    @keyframes fragmentDrift {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-4px); }
     }
-
-    #dreamHUD {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 3;
-      pointer-events: none;
-      padding: 12px 16px;
+    @keyframes corruptGlitch {
+      0%, 100% { transform: skewX(0deg); }
+      25%      { transform: skewX(-2deg); }
+      75%      { transform: skewX(2deg); }
     }
-
-    #dreamTimerBar {
-      width: 100%;
-      height: 4px;
-      background: #1a0a1a;
-      border: 1px solid #330033;
+    @keyframes dreamFlashGood {
+      0%   { box-shadow: inset 0 0 60px rgba(0,255,65,0.4); }
+      100% { box-shadow: inset 0 0 0 transparent; }
     }
-
-    #dreamTimerFill {
-      width: 100%;
-      height: 100%;
-      background: #ff3333;
-      transition: width 0.3s linear;
+    @keyframes dreamFlashBad {
+      0%   { background: rgba(255,0,30,0.25); transform: skewX(3deg); }
+      100% { background: transparent; transform: skewX(0deg); }
     }
-
-    #dreamScore {
-      font-family: 'VT323', monospace;
-      font-size: 0.85em;
-      color: #00ff41;
-      letter-spacing: 3px;
-      margin-top: 6px;
-      text-shadow: 0 0 6px #00ff41;
-    }
-
-    #dreamMessage {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-family: 'VT323', monospace;
-      font-size: 1.6em;
-      color: #ffb000;
-      letter-spacing: 3px;
-      text-shadow: 0 0 12px #ffb000;
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.4s;
-      z-index: 4;
-    }
-
-    #dreamIntro {
-      display: none;
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.88);
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 30px;
-      z-index: 10;
-    }
-
-    #dreamIntroText {
-      font-family: 'VT323', monospace;
-      color: #ff3333;
-      font-size: 1.3em;
-      letter-spacing: 2px;
-      line-height: 2;
-      max-width: 420px;
-      text-shadow: 0 0 8px #ff3333;
-      margin-bottom: 20px;
-    }
-
-    #dreamIntroSub {
-      font-family: 'Share Tech Mono', monospace;
-      color: #555;
-      font-size: 0.65em;
-      letter-spacing: 3px;
-      animation: pulse 1.5s infinite;
-    }
-
-    #dreamHitFlash {
-      position: absolute;
-      inset: 0;
-      background: rgba(255, 0, 0, 0.2);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s;
-      z-index: 5;
-    }
-
-    #dreamHitFlash.active {
-      opacity: 1;
-    }
-
     @keyframes dreamGlitch {
       0%   { filter: none; }
       20%  { filter: hue-rotate(90deg) brightness(2); transform: skewX(5deg); }
@@ -1529,11 +1437,6 @@
       80%  { filter: brightness(0); }
       100% { filter: brightness(0); }
     }
-
-    .crt.glitching {
-      animation: dreamGlitch 0.8s forwards;
-    }
-
     @keyframes dreamFlashOut {
       0%   { background: #fff; }
       20%  { background: #000; }
@@ -1543,9 +1446,123 @@
       100% { background: #000; }
     }
 
-    #dreamOverlay.flash-out {
-      animation: dreamFlashOut 0.6s forwards;
+    #dreamOverlay {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background-color: #0a0012; overflow: hidden;
+      animation: dreamBgShift 8s ease-in-out infinite;
     }
+    #dreamOverlay::after {
+      content: ''; position: absolute; inset: 0; z-index: 99;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px);
+      opacity: 0.5; pointer-events: none;
+    }
+
+    #dreamVignette {
+      position: absolute; inset: 0; pointer-events: none; z-index: 2;
+      background: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.8) 100%);
+      animation: dreamBreathe 4s ease-in-out infinite;
+    }
+
+    #dreamField { position: absolute; inset: 0; z-index: 1; pointer-events: auto; overflow: hidden; }
+
+    .dream-fragment {
+      position: absolute; font-family: 'VT323', 'Courier New', monospace; font-size: 1.3em;
+      min-width: 48px; min-height: 48px; padding: 10px 14px;
+      cursor: pointer; transition: opacity 0.5s, transform 0.3s;
+      border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04);
+      animation: fragmentDrift 3s ease-in-out infinite; line-height: 1.3;
+    }
+    .dream-fragment::before {
+      content: attr(data-text); position: absolute; top: 10px; left: 12px;
+      color: #ff0044; opacity: 0.3; transform: translateX(-2px);
+      pointer-events: none; z-index: -1;
+    }
+    .dream-fragment::after {
+      content: attr(data-text); position: absolute; top: 10px; left: 16px;
+      color: #00ffff; opacity: 0.3; transform: translateX(2px);
+      pointer-events: none; z-index: -1;
+    }
+    .dream-fragment.frag-real {
+      color: #00ff41; text-shadow: 0 0 8px #00ff41;
+      border-color: rgba(0,255,65,0.3); background: rgba(0,255,65,0.08);
+    }
+    .dream-fragment.frag-corrupt {
+      color: #ff2244; text-shadow: 0 0 8px #ff2244;
+      border-color: rgba(255,34,68,0.3); background: rgba(255,34,68,0.08);
+      animation: fragmentDrift 3s ease-in-out infinite, corruptGlitch 0.3s steps(2) infinite;
+    }
+    .dream-fragment.frag-tapped {
+      transform: scale(1.3); opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+    }
+    .dream-fragment.frag-missed {
+      opacity: 0; pointer-events: none; transition: opacity 0.8s ease-out;
+    }
+    @media (max-width: 600px) {
+      .dream-fragment { font-size: 1.1em; }
+    }
+
+    #dreamHUD {
+      position: absolute; top: 12px; left: 16px; right: 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      pointer-events: none; z-index: 5;
+    }
+    #dreamTimerBar {
+      width: 200px; height: 6px;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 3px; overflow: hidden;
+    }
+    #dreamTimerFill {
+      height: 100%; width: 100%;
+      background: linear-gradient(to right, #00ff41, #ff2244);
+      transition: width 0.3s linear; border-radius: 3px;
+    }
+    #dreamScore {
+      font-family: 'VT323', monospace; font-size: 1em;
+      color: #00ff41; letter-spacing: 2px; text-shadow: 0 0 6px #00ff41;
+    }
+
+    #dreamMessage {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'VT323', monospace; font-size: 1.4em;
+      color: #ffb000; letter-spacing: 3px;
+      text-shadow: 0 0 12px #ffb000; text-align: center;
+      opacity: 0; transition: opacity 0.4s; z-index: 6;
+    }
+    #dreamMessage.active { opacity: 1; }
+
+    #dreamIntro {
+      display: none; position: absolute; inset: 0;
+      background: rgba(0,0,0,0.88);
+      flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 30px; z-index: 10;
+    }
+    #dreamIntroText {
+      font-family: 'VT323', monospace; color: #ff3333;
+      font-size: 1.3em; letter-spacing: 2px; line-height: 2;
+      max-width: 420px; text-shadow: 0 0 8px #ff3333; margin-bottom: 20px;
+    }
+    #dreamIntroSub {
+      font-family: 'Share Tech Mono', monospace; color: #555;
+      font-size: 0.65em; letter-spacing: 3px; animation: pulse 1.5s infinite;
+    }
+
+    #dreamHitFlash {
+      position: absolute; inset: 0; pointer-events: none;
+      background: transparent; z-index: 5;
+    }
+    #dreamHitFlash.flash-good { animation: dreamFlashGood 0.3s ease-out forwards; }
+    #dreamHitFlash.flash-bad  { animation: dreamFlashBad 0.2s ease-out forwards; }
+
+    .crt.glitching { animation: dreamGlitch 0.8s forwards; }
+    .crt.dreaming {
+      filter: hue-rotate(0deg);
+      animation: dreamHueRotate 30s linear infinite;
+    }
+    .crt.dreaming::before { opacity: 0.12; }
+    @keyframes dreamHueRotate { to { filter: hue-rotate(360deg); } }
+
+    #dreamOverlay.flash-out { animation: dreamFlashOut 0.6s forwards; }
 
   </style>
 </head>
