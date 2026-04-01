@@ -4748,7 +4748,7 @@ function triggerDreamTransition(introText, callback) {
     setTimeout(function() {
       // Phase 3 — Launch dream game
       document.getElementById('dreamIntro').style.display = 'none';
-      document.getElementById('dreamHUD').style.display = 'block';
+      document.getElementById('dreamHUD').style.display = 'flex';
       crt.classList.remove('glitching');
       if (callback) callback();
     }, 2700);
