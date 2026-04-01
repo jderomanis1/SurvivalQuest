@@ -2430,7 +2430,7 @@ function selectChar(name, subject, object, possessive) {
   startAmbient(gameState.location);
   updatePortrait();
   initTutorial();
-  document.getElementById('cmdInput').focus({ preventScroll: true });
+  softFocus(document.getElementById('cmdInput'));
 }
 
 // Tracks pending pronoun choice for custom form
@@ -2445,7 +2445,7 @@ function showCustomChar() {
   });
   document.querySelector('.char-options').style.display = 'none';
   document.querySelector('.char-subtitle').textContent  = 'CREATE YOUR SURVIVOR';
-  document.getElementById('customName').focus({ preventScroll: true });
+  softFocus(document.getElementById('customName'));
 }
 
 function selectPronoun(subject, object, possessive, btn) {
@@ -4511,8 +4511,14 @@ function triggerEasterEgg(cmd, egg) {
     input.disabled = false;
     goBtn.disabled = false;
     setQuickActionsDisabled(false);
-    input.focus({ preventScroll: true });
+    softFocus(input);
   }, 400);
+}
+
+function softFocus(el) {
+  if (!window.matchMedia('(pointer: coarse)').matches) {
+    el.focus({ preventScroll: true });
+  }
 }
 
 // ════════════════════════════════════════════
@@ -4583,7 +4589,7 @@ function sendCommand() {
     input.disabled = false;
     goBtn.disabled = false;
     setQuickActionsDisabled(false);
-    input.focus({ preventScroll: true });
+    softFocus(input);
     requestAnimationFrame(function(){ var s = document.getElementById('story'); s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' }); });
     saveGame();
   }
@@ -4698,7 +4704,7 @@ window.onload = function() {
     initTutorial(); // will disable itself for returning players
     var helpEl = document.getElementById('helpCharName');
     if (helpEl) helpEl.textContent = character.name;
-    document.getElementById('cmdInput').focus({ preventScroll: true });
+    softFocus(document.getElementById('cmdInput'));
   } else {
     // New player — play intro → boot → char select
     runIntro(function() {
@@ -4848,7 +4854,7 @@ function launchDreamSequence(triggerType) {
           cmdInput.disabled = false;
           goBtn.disabled = false;
           setQuickActionsDisabled(false);
-          cmdInput.focus({ preventScroll: true });
+          softFocus(cmdInput);
         });
       }
     });
