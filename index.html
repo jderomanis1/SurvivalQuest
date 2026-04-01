@@ -2633,7 +2633,8 @@ var gameState = {
   day:       1,
   time:      '09:14 AM',
   location:  'BEDROOM\n6th Floor Apt',
-  inventory: []
+  inventory: [],
+  lastDreamDay: 0
 };
 
 // ════════════════════════════════════════════
@@ -3782,6 +3783,20 @@ function applyParsed(p) {
   if (gameState.morale <= 15 && gameState.morale > 0) {
     launchDreamSequence('morale');
   }
+
+  // Sleep/rest trigger — once per day
+  if (p.narration && !dreamSequenceActive && gameState.lastDreamDay !== gameState.day) {
+    var nar = p.narration.toLowerCase();
+    var sleepKeys = ['fall asleep', 'drift off', 'close your eyes', 'sleep',
+      'rest for the night', 'make camp', 'shelter for the night', 'lay down',
+      'pass out from exhaustion'];
+    for (var sk = 0; sk < sleepKeys.length; sk++) {
+      if (nar.indexOf(sleepKeys[sk]) !== -1) {
+        launchDreamSequence('sleep');
+        break;
+      }
+    }
+  }
 }
 
 // ════════════════════════════════════════════
@@ -4756,8 +4771,13 @@ function endDreamTransition(callback) {
 // ════════════════════════════════════════════
 function launchDreamSequence(triggerType) {
   if (dreamSequenceActive) return;
-  if (dreamSequenceUsed[triggerType] !== undefined && dreamSequenceUsed[triggerType]) return;
+  if (triggerType === 'sleep') {
+    if (gameState.lastDreamDay === gameState.day) return;
+  } else if (dreamSequenceUsed[triggerType] !== undefined && dreamSequenceUsed[triggerType]) {
+    return;
+  }
   dreamSequenceActive = true;
+  gameState.lastDreamDay = gameState.day;
   if (dreamSequenceUsed[triggerType] !== undefined) {
     dreamSequenceUsed[triggerType] = true;
   }
@@ -4773,6 +4793,10 @@ function launchDreamSequence(triggerType) {
   fetchDreamIntro(triggerType, function(introText) {
     triggerDreamTransition(introText, function() {
       // GAMEPLAY LOGIC GOES HERE — PROMPT 4
+      // On dream end, call:
+      //   addLine('<br><em>' + getDreamAftermath() + '</em><br>', 't-narrator');
+      //   fetchDreamDebrief(outcome, ...) → applyDreamOutcome(outcome)
+      //   dreamSequenceActive = false; re-enable inputs
     });
   });
 }
@@ -4790,26 +4814,58 @@ var dreamIntroFallbacks = {
   morale:   'The mind breaks before the body does.',
   artifact: 'The signal was always listening.',
   day7:     'Day seven. The city shows you what it really is.',
-  code:     'You called. Something answered.'
+  code:     'You called. Something answered.',
+  sleep:    'Sleep opens the door. Something steps through.'
 };
+
+function getDreamFragments() {
+  var real = [character.name, 'family', 'home', 'survive', 'remember', 'morning'];
+  var loc = (gameState.location || '').toLowerCase();
+  if (loc.indexOf('apartment') !== -1 || loc.indexOf('building') !== -1) {
+    real.push('roof', 'walls', 'shelter', 'safe');
+  }
+  var inv = (gameState.inventory || []).join(' ').toLowerCase();
+  if (inv.indexOf('food') !== -1 || inv.indexOf('water') !== -1 || inv.indexOf('bread') !== -1 || inv.indexOf('can') !== -1) {
+    real.push('bread', 'water', 'warmth');
+  }
+  if (gameState.morale > 50) real.push('hope', 'strength', 'tomorrow');
+  var log = chatLog.map(function(m) { return m.content || ''; }).join(' ').toLowerCase();
+  if (log.indexOf('chen') !== -1) real.push('neighbor', 'trust', 'together');
+
+  var corrupt = ['forget', 'surrender', 'alone', 'nothing', 'dark', 'lost'];
+  if (gameState.morale < 30) corrupt.push('hopeless', 'give up', 'pointless', 'why bother');
+  if (gameState.hunger < 30) corrupt.push('starving', 'empty', 'hollow');
+  if (gameState.thirst < 30) corrupt.push('parched', 'cracking', 'dried');
+  if (gameState.energy < 30) corrupt.push('collapse', "can't move", 'heavy');
+  if ((gameState.day || 1) >= 5) corrupt.push('too late', 'no time', 'abandoned');
+
+  return { realWords: real.slice(0, 15), corruptWords: corrupt.slice(0, 12) };
+}
+
+function getDreamAftermath() {
+  if (gameState.morale < 25) return 'You jolt awake, heart slamming against your ribs. The dream clings like smoke.';
+  if (gameState.thirst < 25) return 'You wake gasping, mouth bone-dry. For a moment you can\'t tell what\'s real.';
+  if (gameState.hunger < 25) return 'You wake with your stomach in knots. The phantom smell of food fades to nothing.';
+  if (gameState.energy < 25) return 'You drag yourself back to consciousness. Your body feels heavier than before.';
+  return 'You snap awake, disoriented. The static in your head takes a moment to clear.';
+}
 
 function fetchDreamIntro(triggerType, callback) {
   var fallback = dreamIntroFallbacks[triggerType] || dreamIntroFallbacks.code;
+  var pName = character.name || 'the survivor';
+  var pLoc = (gameState.location || 'unknown').split('\n')[0];
   var body = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 80,
     system: 'You write horror-adjacent survival game narration. Terse. Visceral. Never explain — only show.',
     messages: [{
       role: 'user',
-      content: 'You are the narrator of Dark Commute, a survival game. ' +
-        'The player has experienced a psychic break triggered by: ' + triggerType + '. ' +
-        'Write 2–3 lines of fragmentary, visceral narrative describing their mind ' +
-        'fracturing and the city dreamscape bleeding through. ' +
-        'Dark, cinematic, present tense. Max 30 words. ' +
-        'No quotation marks. Start with a short punchy sentence. ' +
-        'Examples of tone: ' +
-        '"The signal finds the cracks first." ' +
-        '"Something that is not the city reaches back."'
+      content: 'Write a 1-sentence surreal dream fragment for a post-apocalyptic survival game. ' +
+        'The player ' + pName + ' is on day ' + (gameState.day || 1) + ' at ' + pLoc +
+        ' with morale at ' + (gameState.morale || 50) + '. ' +
+        'The dream was triggered by: ' + triggerType + '. ' +
+        'Make it surreal, unsettling, and deeply personal. Reference their specific situation. ' +
+        'Under 30 words. No quotes.'
     }]
   });
 
