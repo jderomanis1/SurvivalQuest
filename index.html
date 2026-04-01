@@ -1401,6 +1401,7 @@
 
       .game-title { font-size: 1.2em; letter-spacing: 3px; }
     }
+    /* ── Dream Sequence Overlay ── */
     #dreamOverlay {
       display: none;
       position: absolute;
@@ -1410,72 +1411,52 @@
       overflow: hidden;
     }
 
-    #dreamCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
+    #dreamVignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.8) 100%);
+      z-index: 2;
+    }
+
+    #dreamField {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      /* Play area for 2D tap-target fragments — Prompt 4 */
     }
 
     #dreamHUD {
       position: absolute;
-      inset: 0;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 3;
       pointer-events: none;
-      display: none;
+      padding: 12px 16px;
     }
 
-    #dreamTimer {
-      position: absolute;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    #dreamTimerBar {
+      width: 100%;
+      height: 4px;
+      background: #1a0a1a;
+      border: 1px solid #330033;
+    }
+
+    #dreamTimerFill {
+      width: 100%;
+      height: 100%;
+      background: #ff3333;
+      transition: width 0.3s linear;
+    }
+
+    #dreamScore {
       font-family: 'VT323', monospace;
-      color: #ff3333;
-      text-shadow: 0 0 10px #ff3333;
-    }
-
-    #dreamTimerLabel {
-      font-size: 0.75em;
-      letter-spacing: 4px;
-      opacity: 0.7;
-    }
-
-    #dreamTimerCount {
-      font-size: 3em;
-      line-height: 1;
-    }
-
-    #dreamAmmo {
-      position: absolute;
-      bottom: 20px;
-      right: 16px;
-      font-family: 'VT323', monospace;
-      font-size: 0.9em;
+      font-size: 0.85em;
       color: #00ff41;
-      letter-spacing: 2px;
-    }
-
-    #dreamKills {
-      position: absolute;
-      bottom: 40px;
-      right: 16px;
-      font-family: 'VT323', monospace;
-      font-size: 0.75em;
-      color: #00aa2a;
-      letter-spacing: 2px;
-    }
-
-    #dreamCrosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 1.5em;
-      color: rgba(255,255,255,0.6);
-      pointer-events: none;
-      line-height: 1;
+      letter-spacing: 3px;
+      margin-top: 6px;
+      text-shadow: 0 0 6px #00ff41;
     }
 
     #dreamMessage {
@@ -1491,6 +1472,7 @@
       text-align: center;
       opacity: 0;
       transition: opacity 0.4s;
+      z-index: 4;
     }
 
     #dreamIntro {
@@ -1537,15 +1519,6 @@
 
     #dreamHitFlash.active {
       opacity: 1;
-    }
-
-    @keyframes dreamTimerPulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    #dreamTimerCount.pulse {
-      animation: dreamTimerPulse 0.4s infinite;
     }
 
     @keyframes dreamGlitch {
@@ -1956,25 +1929,18 @@
 
     <!-- DREAM SEQUENCE OVERLAY -->
     <div id="dreamOverlay">
-      <canvas id="dreamCanvas"></canvas>
-
-      <div id="dreamHUD">
-        <div id="dreamTimer">
-          <span id="dreamTimerLabel">SIGNAL BREACH</span>
-          <span id="dreamTimerCount">60</span>
-        </div>
-        <div id="dreamAmmo">⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛ AMMO: <span id="ammoCount">10</span></div>
-        <div id="dreamKills">THREATS NEUTRALIZED: <span id="killCount">0</span></div>
-        <div id="dreamCrosshair">+</div>
-        <div id="dreamMessage"></div>
-      </div>
-
-      <div id="dreamHitFlash"></div>
-
+      <div id="dreamVignette"></div>
       <div id="dreamIntro">
         <div id="dreamIntroText"></div>
         <div id="dreamIntroSub">REALITY FRACTURING — BRACE FOR IMPACT</div>
       </div>
+      <div id="dreamField"></div>
+      <div id="dreamHUD" style="display:none;">
+        <div id="dreamTimerBar"><div id="dreamTimerFill"></div></div>
+        <div id="dreamScore">SIGNAL: 0</div>
+      </div>
+      <div id="dreamMessage"></div>
+      <div id="dreamHitFlash"></div>
     </div>
 
   </div><!-- /crt -->
@@ -4784,574 +4750,21 @@ function launchDreamSequence(triggerType) {
   cmdInput.disabled = true;
   goBtn.disabled = true;
 
-  var dreamActive = { value: true };
   var dreamAudio = initDreamAudio();
   dreamAudioRef = dreamAudio;
 
   fetchDreamIntro(triggerType, function(introText) {
     triggerDreamTransition(introText, function() {
-      var dreamScene = buildDreamScene();
-      var controls = initDreamControls(dreamScene.camera, dreamActive);
-      spawnDreamEnemies(dreamScene.scene);
-      var shooting = initDreamShooting(dreamScene.scene, dreamScene.camera, dreamEnemies, dreamActive);
-
-      dreamAudio.startDrone();
-
-      // Inject enemy + control updates into the render loop
-      function dreamLoop() {
-        if (!dreamActive.value) return;
-        dreamScene.animationId = requestAnimationFrame(dreamLoop);
-        controls.update();
-
-        // Check for nearby enemies for warning sound
-        var anyClose = false;
-        for (var ei = 0; ei < dreamEnemies.length; ei++) {
-          if (dreamEnemies[ei].alive && dreamEnemies[ei].mesh.position.z > -5) {
-            anyClose = true;
-            break;
-          }
-        }
-        if (anyClose) dreamAudio.startWarning();
-        else dreamAudio.stopWarning();
-
-        updateDreamEnemies(dreamScene.scene, dreamScene.camera, function() {
-          // Early exit — player overwhelmed
-          dreamActive.value = false;
-          endDreamEarly(function(outcome) {
-            cleanupDream(outcome);
-          });
-        });
-        dreamScene.renderer.render(dreamScene.scene, dreamScene.camera);
-      }
-      // Stop the original loop started by buildDreamScene and replace it
-      cancelAnimationFrame(dreamScene.animationId);
-      dreamLoop();
-
-      runDreamTimer(dreamAudio, function(outcome) {
-        dreamActive.value = false;
-        cleanupDream(outcome);
-      });
-
-      var dreamCleaned = false;
-      function cleanupDream(outcome) {
-        if (dreamCleaned) return;
-        dreamCleaned = true;
-        if (dreamTimerInterval) { clearInterval(dreamTimerInterval); dreamTimerInterval = null; }
-        cancelAnimationFrame(dreamScene.animationId);
-        controls.cleanup();
-        shooting.cleanup();
-        dreamAudio.stopDrone();
-        dreamAudio.stopWarning();
-        dreamAudio.playSnapBack();
-        dreamAudio.cleanup();
-        dreamAudioRef = null;
-        dreamScene.renderer.dispose();
-
-        fetchDreamDebrief(outcome, function(debriefText) {
-          addLine('<br>' + debriefText + '<br><span class="cursor"></span>', 't-narrator');
-          applyDreamOutcome(outcome);
-          dreamSequenceActive = false;
-          cmdInput.disabled = false;
-          goBtn.disabled = false;
-          setQuickActionsDisabled(false);
-          softFocus(cmdInput);
-        });
-      }
+      // GAMEPLAY LOGIC GOES HERE — PROMPT 4
     });
   });
 }
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-// ════════════════════════════════════════════
-//  DREAM SEQUENCE — THREE.JS SCENE
-// ════════════════════════════════════════════
-function buildDreamScene() {
-  var canvas = document.getElementById('dreamCanvas');
-  var w = canvas.clientWidth || 600;
-  var h = canvas.clientHeight || 400;
-
-  // Renderer
-  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false });
-  renderer.setSize(w, h);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-  // Scene
-  var scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0008);
-  scene.fog = new THREE.FogExp2(0x0a0008, 0.08);
-
-  // Camera
-  var camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 100);
-  camera.position.set(0, 1.6, 2);
-  camera.lookAt(0, 1.6, -10);
-
-  // ── Lighting ──
-  var ambient = new THREE.AmbientLight(0x110008, 0.3);
-  scene.add(ambient);
-
-  var dirLight = new THREE.DirectionalLight(0xff2200, 0.4);
-  dirLight.position.set(5, 10, 2);
-  scene.add(dirLight);
-
-  // Streetlights (flickering)
-  var streetLights = [];
-  var slPositions = [
-    [-5, 4, -8], [5, 4, -8],
-    [-5, 4, -24], [5, 4, -24]
-  ];
-  for (var i = 0; i < slPositions.length; i++) {
-    var sl = new THREE.PointLight(0xff6600, 1.5, 12);
-    sl.position.set(slPositions[i][0], slPositions[i][1], slPositions[i][2]);
-    scene.add(sl);
-    streetLights.push(sl);
-  }
-
-  // ── Ground ──
-  var groundGeo = new THREE.PlaneGeometry(80, 80);
-  var groundMat = new THREE.MeshLambertMaterial({ color: 0x1a0a1a });
-  var ground = new THREE.Mesh(groundGeo, groundMat);
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = 0;
-  scene.add(ground);
-
-  // ── Road markings ──
-  var markMat = new THREE.MeshLambertMaterial({ color: 0x332233 });
-  for (var m = 0; m < 3; m++) {
-    var mark = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 6), markMat);
-    mark.position.set(0, 0.01, -5 - m * 8);
-    scene.add(mark);
-  }
-
-  // ── Buildings ──
-  var buildMat = new THREE.MeshLambertMaterial({ color: 0x1a0a20 });
-  var winColors = [0xff3300, 0xffaa00];
-  var zPositions = [-5, -13, -21, -29];
-
-  for (var side = 0; side < 2; side++) {
-    var xSign = side === 0 ? -1 : 1;
-    for (var b = 0; b < 4; b++) {
-      var bw = 3 + Math.random() * 2;
-      var bh = 4 + Math.random() * 8;
-      var bd = 3 + Math.random() * 2;
-      var bx = xSign * (8 + Math.random() * 4);
-      var bz = zPositions[b];
-
-      var building = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), buildMat);
-      building.position.set(bx, bh / 2, bz);
-      scene.add(building);
-
-      // Glowing windows (2–3 per building)
-      var numWins = 2 + Math.floor(Math.random() * 2);
-      for (var wi = 0; wi < numWins; wi++) {
-        var winMat = new THREE.MeshBasicMaterial({ color: winColors[wi % 2] });
-        var win = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.05), winMat);
-        var wx = bx + (Math.random() - 0.5) * (bw * 0.6);
-        var wy = 1.5 + Math.random() * (bh - 3);
-        var wz = bz + (side === 0 ? bd / 2 + 0.03 : -bd / 2 - 0.03);
-        win.position.set(wx, wy, wz);
-        scene.add(win);
-      }
-    }
-  }
-
-  // ── Debris ──
-  var debrisMat = new THREE.MeshLambertMaterial({ color: 0x2a1a2a });
-  for (var d = 0; d < 12; d++) {
-    var ds = 0.3 + Math.random() * 0.9;
-    var debris = new THREE.Mesh(
-      new THREE.BoxGeometry(ds, ds * 0.6, ds),
-      debrisMat
-    );
-    debris.position.set(
-      (Math.random() - 0.5) * 10,
-      Math.random() * 0.5,
-      -(5 + Math.random() * 35)
-    );
-    debris.rotation.set(Math.random(), Math.random(), Math.random());
-    scene.add(debris);
-  }
-
-  // ── Render loop ──
-  var frameCount = 0;
-  var nextFlicker = 30 + Math.floor(Math.random() * 60);
-  var result = { scene: scene, camera: camera, renderer: renderer, animationId: null };
-
-  function animate() {
-    result.animationId = requestAnimationFrame(animate);
-    frameCount++;
-
-    // Flicker streetlights
-    if (frameCount >= nextFlicker) {
-      for (var li = 0; li < streetLights.length; li++) {
-        streetLights[li].intensity = 0.2 + Math.random() * 1.8;
-      }
-      nextFlicker = frameCount + 30 + Math.floor(Math.random() * 60);
-    }
-
-    renderer.render(scene, camera);
-  }
-
-  animate();
-
-  return result;
-}
 
 // ════════════════════════════════════════════
-//  DREAM CONTROLS — WASD + MOUSE LOOK
+//  DREAM SEQUENCE — 2D GAMEPLAY (placeholder)
+//  Old Three.js scene, controls, enemies, and shooting removed.
+//  New 2D reality-stabilization mini-game will be added in Prompt 4.
 // ════════════════════════════════════════════
-function initDreamControls(camera, dreamActive) {
-  var canvas = document.getElementById('dreamCanvas');
-  var keys = { w: false, a: false, s: false, d: false };
-  var yaw = 0;
-  var pitch = 0;
-  var locked = false;
-  var moveSpeed = 0.06;
-
-  function onCanvasClick() {
-    if (dreamActive.value) canvas.requestPointerLock();
-  }
-
-  function onLockChange() {
-    locked = (document.pointerLockElement === canvas);
-  }
-
-  function onMouseMove(e) {
-    if (!locked || !dreamActive.value) return;
-    yaw -= e.movementX * 0.002;
-    pitch -= e.movementY * 0.002;
-    pitch = Math.max(-0.3, Math.min(0.3, pitch));
-    camera.rotation.order = 'YXZ';
-    camera.rotation.y = yaw;
-    camera.rotation.x = pitch;
-  }
-
-  function onKeyDown(e) {
-    if (!dreamActive.value) return;
-    var k = e.key.toLowerCase();
-    if (keys.hasOwnProperty(k)) {
-      keys[k] = true;
-      e.preventDefault();
-    }
-  }
-
-  function onKeyUp(e) {
-    if (!dreamActive.value) return;
-    var k = e.key.toLowerCase();
-    if (keys.hasOwnProperty(k)) {
-      keys[k] = false;
-      e.preventDefault();
-    }
-  }
-
-  canvas.addEventListener('click', onCanvasClick);
-  document.addEventListener('pointerlockchange', onLockChange);
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('keydown', onKeyDown);
-  document.addEventListener('keyup', onKeyUp);
-
-  // Movement update — call each frame from render loop
-  function update() {
-    if (!dreamActive.value) return;
-
-    var forward = new THREE.Vector3(0, 0, -1);
-    forward.applyQuaternion(camera.quaternion);
-    forward.y = 0;
-    forward.normalize();
-
-    var right = new THREE.Vector3(1, 0, 0);
-    right.applyQuaternion(camera.quaternion);
-    right.y = 0;
-    right.normalize();
-
-    if (keys.w) camera.position.addScaledVector(forward, moveSpeed);
-    if (keys.s) camera.position.addScaledVector(forward, -moveSpeed);
-    if (keys.a) camera.position.addScaledVector(right, -moveSpeed);
-    if (keys.d) camera.position.addScaledVector(right, moveSpeed);
-
-    // Clamp to street boundaries
-    camera.position.x = Math.max(-5, Math.min(5, camera.position.x));
-    camera.position.z = Math.max(-38, Math.min(2, camera.position.z));
-    camera.position.y = 1.6;
-  }
-
-  function cleanup() {
-    canvas.removeEventListener('click', onCanvasClick);
-    document.removeEventListener('pointerlockchange', onLockChange);
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('keydown', onKeyDown);
-    document.removeEventListener('keyup', onKeyUp);
-    if (document.pointerLockElement === canvas) document.exitPointerLock();
-    keys.w = keys.a = keys.s = keys.d = false;
-  }
-
-  return { update: update, cleanup: cleanup };
-}
-
-// ════════════════════════════════════════════
-//  DREAM ENEMIES — CORRUPTED SHADOWS
-// ════════════════════════════════════════════
-var dreamEnemies = [];
-var dreamHealth = 100;
-var dreamKillCount = 0;
-var dreamAudioRef = null;
-
-function createEnemyMesh() {
-  var group = new THREE.Group();
-
-  // Body
-  var bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.4, 8);
-  var bodySolid = new THREE.Mesh(bodyGeo, new THREE.MeshBasicMaterial({ color: 0x330022 }));
-  var bodyWire = new THREE.Mesh(bodyGeo, new THREE.MeshBasicMaterial({ color: 0xff0066, wireframe: true }));
-  group.add(bodySolid);
-  group.add(bodyWire);
-
-  // Head
-  var headGeo = new THREE.SphereGeometry(0.25, 8, 6);
-  var headSolid = new THREE.Mesh(headGeo, new THREE.MeshBasicMaterial({ color: 0x330022 }));
-  headSolid.position.y = 0.95;
-  var headWire = new THREE.Mesh(headGeo, new THREE.MeshBasicMaterial({ color: 0xff0066, wireframe: true }));
-  headWire.position.y = 0.95;
-  group.add(headSolid);
-  group.add(headWire);
-
-  return group;
-}
-
-function spawnDreamEnemies(scene) {
-  dreamEnemies = [];
-  dreamHealth = 100;
-  dreamKillCount = 0;
-  document.getElementById('killCount').textContent = '0';
-
-  for (var i = 0; i < 6; i++) {
-    var mesh = createEnemyMesh();
-    var zPos = -8 - (i * 5.4);
-    mesh.position.set((Math.random() - 0.5) * 6, 0.9, zPos);
-    scene.add(mesh);
-    dreamEnemies.push({
-      mesh: mesh,
-      health: 1,
-      alive: true,
-      speed: 0.008 + Math.random() * 0.006
-    });
-  }
-}
-
-function respawnEnemy(enemy, scene) {
-  enemy.alive = true;
-  enemy.health = 1;
-  var mesh = createEnemyMesh();
-  mesh.position.set((Math.random() - 0.5) * 6, 0.9, -30 - Math.random() * 5);
-  scene.add(mesh);
-  enemy.mesh = mesh;
-}
-
-function flashHit() {
-  var el = document.getElementById('dreamHitFlash');
-  el.classList.add('active');
-  setTimeout(function() { el.classList.remove('active'); }, 200);
-  if (dreamAudioRef) dreamAudioRef.playPlayerHit();
-}
-
-function updateDreamEnemies(scene, camera, onDreamFail) {
-  for (var i = 0; i < dreamEnemies.length; i++) {
-    var e = dreamEnemies[i];
-    if (!e.alive) continue;
-
-    e.mesh.position.z += e.speed;
-
-    if (e.mesh.position.z > 1.5) {
-      dreamHealth -= 25;
-      flashHit();
-      scene.remove(e.mesh);
-      if (dreamHealth <= 0) {
-        e.alive = false;
-        if (onDreamFail) onDreamFail();
-        return;
-      }
-      respawnEnemy(e, scene);
-    }
-  }
-}
-
-// ════════════════════════════════════════════
-//  DREAM SHOOTING
-// ════════════════════════════════════════════
-function initDreamShooting(scene, camera, enemies, dreamActive) {
-  var ammo = 10;
-  var maxAmmo = 10;
-  var raycaster = new THREE.Raycaster();
-  var center = new THREE.Vector2(0, 0);
-  var reloadInterval = null;
-
-  function updateAmmoDisplay() {
-    var filled = '';
-    var empty = '';
-    for (var i = 0; i < maxAmmo; i++) {
-      if (i < ammo) filled += '\u2B1B'; else empty += '\u2B1C';
-    }
-    document.getElementById('dreamAmmo').innerHTML =
-      filled + empty + ' AMMO: <span id="ammoCount">' + ammo + '</span>';
-  }
-
-  function flashCrosshair() {
-    var ch = document.getElementById('dreamCrosshair');
-    ch.style.color = '#ff0000';
-    setTimeout(function() { ch.style.color = 'rgba(255,255,255,0.6)'; }, 150);
-  }
-
-  function showMessage(text) {
-    var msg = document.getElementById('dreamMessage');
-    msg.textContent = text;
-    msg.style.opacity = '1';
-    setTimeout(function() { msg.style.opacity = '0'; }, 1000);
-  }
-
-  function onShoot(e) {
-    if (!dreamActive.value) return;
-    if (document.pointerLockElement !== document.getElementById('dreamCanvas')) return;
-
-    if (ammo <= 0) {
-      showMessage('NO AMMO');
-      return;
-    }
-
-    ammo--;
-    updateAmmoDisplay();
-    flashCrosshair();
-
-    raycaster.setFromCamera(center, camera);
-    var meshes = [];
-    for (var i = 0; i < enemies.length; i++) {
-      if (enemies[i].alive) {
-        meshes.push.apply(meshes, enemies[i].mesh.children);
-      }
-    }
-    var hits = raycaster.intersectObjects(meshes);
-    if (hits.length > 0) {
-      var hitObj = hits[0].object;
-      for (var j = 0; j < enemies.length; j++) {
-        if (!enemies[j].alive) continue;
-        var children = enemies[j].mesh.children;
-        for (var c = 0; c < children.length; c++) {
-          if (children[c] === hitObj) {
-            enemies[j].alive = false;
-            scene.remove(enemies[j].mesh);
-            dreamKillCount++;
-            document.getElementById('killCount').textContent = dreamKillCount;
-            if (dreamAudioRef) dreamAudioRef.playGlitchHit();
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  document.addEventListener('click', onShoot);
-
-  // Auto-reload: +2 every 8 seconds
-  reloadInterval = setInterval(function() {
-    if (!dreamActive.value) return;
-    if (ammo < maxAmmo) {
-      ammo = Math.min(maxAmmo, ammo + 2);
-      updateAmmoDisplay();
-    }
-  }, 8000);
-
-  updateAmmoDisplay();
-
-  function cleanup() {
-    document.removeEventListener('click', onShoot);
-    clearInterval(reloadInterval);
-  }
-
-  return { cleanup: cleanup };
-}
-
-// ════════════════════════════════════════════
-//  DREAM TIMER & OUTCOME
-// ════════════════════════════════════════════
-var dreamTimerInterval = null;
-
-function buildDreamOutcome() {
-  var survived = dreamHealth > 0;
-  var statBonus;
-  if (survived && dreamKillCount >= 4) {
-    statBonus = { morale: 20, energy: 15, message: 'The signal strengthened you.' };
-  } else if (survived) {
-    statBonus = { morale: 10, energy: 5, message: 'You endured.' };
-  } else {
-    statBonus = { morale: -15, energy: -10, message: 'The signal broke something in you.' };
-  }
-  return {
-    survived: survived,
-    kills: dreamKillCount,
-    healthRemaining: dreamHealth,
-    statBonus: statBonus
-  };
-}
-
-function endDreamEarly(onComplete) {
-  if (dreamTimerInterval) {
-    clearInterval(dreamTimerInterval);
-    dreamTimerInterval = null;
-  }
-  var msg = document.getElementById('dreamMessage');
-  msg.textContent = 'OVERWHELMED';
-  msg.style.opacity = '1';
-  setTimeout(function() {
-    msg.style.opacity = '0';
-    var outcome = buildDreamOutcome();
-    endDreamTransition(function() {
-      if (onComplete) onComplete(outcome);
-    });
-  }, 1000);
-}
-
-function runDreamTimer(dreamAudio, onComplete) {
-  var remaining = 60;
-  var timerEl = document.getElementById('dreamTimerCount');
-  var timerLabel = document.getElementById('dreamTimerLabel');
-  timerEl.textContent = remaining;
-  timerEl.classList.remove('pulse');
-  timerEl.style.color = '';
-  timerLabel.style.color = '';
-
-  dreamTimerInterval = setInterval(function() {
-    remaining--;
-    timerEl.textContent = remaining;
-
-    if (remaining <= 10 && remaining > 0 && dreamAudio) {
-      dreamAudio.playTimerBeep();
-    }
-
-    if (remaining <= 5) {
-      timerEl.classList.add('pulse');
-    } else if (remaining <= 10) {
-      timerEl.style.color = '#ffaa00';
-      timerLabel.style.color = '#ffaa00';
-      timerEl.style.textShadow = '0 0 10px #ffaa00';
-    }
-
-    if (remaining <= 0) {
-      clearInterval(dreamTimerInterval);
-      dreamTimerInterval = null;
-      timerEl.classList.remove('pulse');
-
-      var msg = document.getElementById('dreamMessage');
-      msg.textContent = 'SIGNAL FADING';
-      msg.style.opacity = '1';
-      setTimeout(function() {
-        msg.style.opacity = '0';
-        var outcome = buildDreamOutcome();
-        endDreamTransition(function() {
-          if (onComplete) onComplete(outcome);
-        });
-      }, 1500);
-    }
-  }, 1000);
-}
 
 // ════════════════════════════════════════════
 //  DREAM NARRATIVE — CLAUDE INTRO & DEBRIEF
