@@ -4792,20 +4792,198 @@ function launchDreamSequence(triggerType) {
 
   fetchDreamIntro(triggerType, function(introText) {
     triggerDreamTransition(introText, function() {
-      // GAMEPLAY LOGIC GOES HERE — PROMPT 4
-      // On dream end, call:
-      //   addLine('<br><em>' + getDreamAftermath() + '</em><br>', 't-narrator');
-      //   fetchDreamDebrief(outcome, ...) → applyDreamOutcome(outcome)
-      //   dreamSequenceActive = false; re-enable inputs
+      runDreamGame(function(outcome) {
+        endDreamTransition(function() {
+          addLine('<br><em>' + getDreamAftermath() + '</em><br>', 't-narrator');
+          applyDreamOutcome(outcome);
+          fetchDreamDebrief(outcome, function(debriefText) {
+            addLine(debriefText + '<br><span class="cursor"></span>', 't-narrator');
+          });
+          dreamSequenceActive = false;
+          cmdInput.disabled = false;
+          goBtn.disabled = false;
+          setQuickActionsDisabled(false);
+          softFocus(cmdInput);
+        });
+      });
     });
   });
 }
 
 // ════════════════════════════════════════════
-//  DREAM SEQUENCE — 2D GAMEPLAY (placeholder)
-//  Old Three.js scene, controls, enemies, and shooting removed.
-//  New 2D reality-stabilization mini-game will be added in Prompt 4.
+//  DREAM SEQUENCE — REALITY STABILIZATION GAME
 // ════════════════════════════════════════════
+function runDreamGame(onComplete) {
+  var frags = getDreamFragments();
+  var realPool = frags.realWords.slice();
+  var corruptPool = frags.corruptWords.slice();
+  var realIdx = 0, corruptIdx = 0;
+  var score = 0, hits = 0, misses = 0, penalties = 0;
+  var DURATION = 30000;
+  var startTime = Date.now();
+  var field = document.getElementById('dreamField');
+  var hud = document.getElementById('dreamHUD');
+  var timerFill = document.getElementById('dreamTimerFill');
+  var scoreEl = document.getElementById('dreamScore');
+  var msgEl = document.getElementById('dreamMessage');
+  var crt = document.querySelector('.crt');
+  var cleanedUp = false;
+  var spawnIv = null, timerIv = null, accelTo1 = null, accelTo2 = null;
+
+  field.innerHTML = '';
+  hud.style.display = 'flex';
+  timerFill.style.width = '100%';
+  scoreEl.textContent = 'SIGNAL: 0';
+  crt.classList.add('dreaming');
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+  }
+  shuffle(realPool); shuffle(corruptPool);
+
+  function nextWord(isReal) {
+    if (isReal) {
+      if (realIdx >= realPool.length) { realIdx = 0; shuffle(realPool); }
+      return realPool[realIdx++];
+    }
+    if (corruptIdx >= corruptPool.length) { corruptIdx = 0; shuffle(corruptPool); }
+    return corruptPool[corruptIdx++];
+  }
+
+  function flashHit(cls) {
+    var el = document.getElementById('dreamHitFlash');
+    el.classList.remove('flash-good', 'flash-bad');
+    void el.offsetWidth;
+    el.classList.add(cls);
+    setTimeout(function() { el.classList.remove(cls); }, 300);
+  }
+
+  function updateScore() {
+    scoreEl.textContent = 'SIGNAL: ' + score;
+  }
+
+  function spawnFragment() {
+    if (cleanedUp) return;
+    if (field.querySelectorAll('.dream-fragment:not(.frag-tapped):not(.frag-missed)').length >= 6) return;
+
+    var isReal = Math.random() < 0.6;
+    var word = nextWord(isReal);
+    var el = document.createElement('div');
+    el.className = 'dream-fragment ' + (isReal ? 'frag-real' : 'frag-corrupt');
+    el.setAttribute('data-text', word);
+    el.textContent = word;
+
+    var maxX = field.clientWidth - 120;
+    var maxY = field.clientHeight - 80;
+    el.style.left = (60 + Math.random() * Math.max(0, maxX - 60)) + 'px';
+    el.style.top = (60 + Math.random() * Math.max(0, maxY - 60)) + 'px';
+    el.style.opacity = '0';
+    field.appendChild(el);
+    requestAnimationFrame(function() { el.style.opacity = '1'; });
+
+    var tapped = false;
+    function onTap(e) {
+      e.preventDefault(); e.stopPropagation();
+      if (tapped || cleanedUp) return;
+      tapped = true;
+      el.removeEventListener('click', onTap);
+      el.removeEventListener('touchstart', onTap);
+      if (isReal) {
+        score += 10; hits++;
+        flashHit('flash-good');
+        if (dreamAudioRef && dreamAudioRef.playGlitchHit) dreamAudioRef.playGlitchHit();
+      } else {
+        score -= 15; penalties++;
+        gameState.morale = Math.max(0, (gameState.morale || 50) - 2);
+        flashHit('flash-bad');
+        if (dreamAudioRef && dreamAudioRef.playPlayerHit) dreamAudioRef.playPlayerHit();
+      }
+      updateScore();
+      el.classList.add('frag-tapped');
+      setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 200);
+    }
+    el.addEventListener('click', onTap);
+    el.addEventListener('touchstart', onTap, { passive: false });
+
+    setTimeout(function() {
+      if (tapped || cleanedUp) return;
+      tapped = true;
+      el.removeEventListener('click', onTap);
+      el.removeEventListener('touchstart', onTap);
+      if (isReal) { score -= 5; misses++; updateScore(); }
+      el.classList.add('frag-missed');
+      setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 800);
+    }, 2500);
+  }
+
+  function setSpawnRate(ms) {
+    if (spawnIv) clearInterval(spawnIv);
+    spawnIv = setInterval(spawnFragment, ms);
+  }
+
+  setSpawnRate(1400);
+  spawnFragment();
+  accelTo1 = setTimeout(function() { setSpawnRate(900); }, 10000);
+  accelTo2 = setTimeout(function() { setSpawnRate(500); }, 20000);
+
+  timerIv = setInterval(function() {
+    if (cleanedUp) return;
+    var elapsed = Date.now() - startTime;
+    var pct = Math.max(0, 100 - (elapsed / DURATION) * 100);
+    timerFill.style.width = pct + '%';
+    if (elapsed >= DURATION) cleanup();
+  }, 100);
+
+  if (dreamAudioRef && dreamAudioRef.startDrone) dreamAudioRef.startDrone();
+
+  function cleanup() {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    if (spawnIv) clearInterval(spawnIv);
+    if (timerIv) clearInterval(timerIv);
+    if (accelTo1) clearTimeout(accelTo1);
+    if (accelTo2) clearTimeout(accelTo2);
+    if (dreamAudioRef) {
+      if (dreamAudioRef.stopDrone) dreamAudioRef.stopDrone();
+      if (dreamAudioRef.stopWarning) dreamAudioRef.stopWarning();
+      if (dreamAudioRef.playSnapBack) dreamAudioRef.playSnapBack();
+      if (dreamAudioRef.cleanup) dreamAudioRef.cleanup();
+      dreamAudioRef = null;
+    }
+    field.innerHTML = '';
+    hud.style.display = 'none';
+    crt.classList.remove('dreaming');
+
+    var statBonus, msg, tier;
+    if (score >= 80) {
+      statBonus = { morale: 8, energy: 5 }; msg = 'REALITY STABILIZED'; tier = 'good';
+    } else if (score >= 30) {
+      statBonus = { morale: 3, energy: 0 }; msg = 'SIGNAL HELD'; tier = 'neutral';
+    } else {
+      statBonus = { morale: -5, energy: -3 }; msg = 'SIGNAL DEGRADED'; tier = 'bad';
+    }
+
+    msgEl.textContent = msg;
+    msgEl.classList.add('active');
+    setTimeout(function() {
+      msgEl.classList.remove('active');
+      onComplete({
+        survived: tier !== 'bad',
+        kills: hits,
+        healthRemaining: Math.max(0, score),
+        statBonus: statBonus,
+        tier: tier,
+        score: score,
+        hits: hits,
+        misses: misses,
+        penalties: penalties
+      });
+    }, 2000);
+  }
+}
 
 // ════════════════════════════════════════════
 //  DREAM NARRATIVE — CLAUDE INTRO & DEBRIEF
