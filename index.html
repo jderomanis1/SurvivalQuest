@@ -4735,8 +4735,9 @@ document.addEventListener('click', function resumeAudio() {
 function triggerDreamTransition(introText, callback) {
   var crt = document.querySelector('.crt');
 
-  // Phase 1 — Screen glitch (0–800ms)
+  // Phase 1 — Screen glitch + entry sound (0–800ms)
   crt.classList.add('glitching');
+  if (dreamAudioRef && dreamAudioRef.startEntry) dreamAudioRef.startEntry();
 
   setTimeout(function() {
     // Phase 2 — Show intro (800ms–3500ms)
@@ -4745,7 +4746,7 @@ function triggerDreamTransition(introText, callback) {
     document.getElementById('dreamIntroText').textContent = introText;
 
     setTimeout(function() {
-      // Phase 3 — Launch 3D (3500ms)
+      // Phase 3 — Launch dream game
       document.getElementById('dreamIntro').style.display = 'none';
       document.getElementById('dreamHUD').style.display = 'block';
       crt.classList.remove('glitching');
@@ -4894,12 +4895,12 @@ function runDreamGame(onComplete) {
       if (isReal) {
         score += 10; hits++;
         flashHit('flash-good');
-        if (dreamAudioRef && dreamAudioRef.playGlitchHit) dreamAudioRef.playGlitchHit();
+        if (dreamAudioRef && dreamAudioRef.playCorrect) dreamAudioRef.playCorrect();
       } else {
         score -= 15; penalties++;
         gameState.morale = Math.max(0, (gameState.morale || 50) - 2);
         flashHit('flash-bad');
-        if (dreamAudioRef && dreamAudioRef.playPlayerHit) dreamAudioRef.playPlayerHit();
+        if (dreamAudioRef && dreamAudioRef.playWrong) dreamAudioRef.playWrong();
       }
       updateScore();
       el.classList.add('frag-tapped');
@@ -4947,11 +4948,11 @@ function runDreamGame(onComplete) {
     if (accelTo1) clearTimeout(accelTo1);
     if (accelTo2) clearTimeout(accelTo2);
     if (dreamAudioRef) {
-      if (dreamAudioRef.stopDrone) dreamAudioRef.stopDrone();
-      if (dreamAudioRef.stopWarning) dreamAudioRef.stopWarning();
-      if (dreamAudioRef.playSnapBack) dreamAudioRef.playSnapBack();
-      if (dreamAudioRef.cleanup) dreamAudioRef.cleanup();
-      dreamAudioRef = null;
+      if (dreamAudioRef.playExit) dreamAudioRef.playExit();
+      setTimeout(function() {
+        if (dreamAudioRef && dreamAudioRef.stopAll) dreamAudioRef.stopAll();
+        dreamAudioRef = null;
+      }, 1200);
     }
     field.innerHTML = '';
     hud.style.display = 'none';
@@ -5145,191 +5146,139 @@ function applyDreamOutcome(outcome) {
 }
 
 // ════════════════════════════════════════════
-//  DREAM AUDIO — WEB AUDIO API
+//  DREAM AUDIO — PROCEDURAL NIGHTMARE SOUNDS
 // ════════════════════════════════════════════
 function initDreamAudio() {
-  var ctx = null;
-  var droneOsc = null;
-  var droneGain = null;
-  var warningOsc = null;
-  var warningGain = null;
-  var warningOn = false;
-  var warningPulseInterval = null;
-  var active = false;
+  var nodes = [];
+  var dreamGain = null;
 
-  function ensureCtx() {
-    if (!ctx) {
-      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-      catch(e) { return false; }
-    }
+  function ok() {
+    if (!audioEnabled) return false;
+    var ctx = getAudioCtx();
+    if (!ctx) return false;
     if (ctx.state === 'suspended') ctx.resume();
+    if (!dreamGain) {
+      dreamGain = ctx.createGain();
+      dreamGain.gain.value = 1;
+      dreamGain.connect(ctx.destination);
+    }
     return true;
   }
 
-  function canPlay() {
-    return audioEnabled && ensureCtx();
+  function track(node) { nodes.push(node); return node; }
+
+  function makeDistortion(amount) {
+    var ctx = getAudioCtx();
+    var ws = ctx.createWaveShaper();
+    var n = 256, curve = new Float32Array(n);
+    for (var i = 0; i < n; i++) {
+      var x = (i * 2) / n - 1;
+      curve[i] = ((Math.PI + amount) * x) / (Math.PI + amount * Math.abs(x));
+    }
+    ws.curve = curve;
+    return ws;
   }
 
-  // ── Ambient drone ──
+  function startEntry() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var osc = track(ctx.createOscillator());
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.linearRampToValueAtTime(100, t + 1.5);
+    var dist = makeDistortion(50);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.2, t);
+    g.gain.linearRampToValueAtTime(0, t + 1.5);
+    osc.connect(dist); dist.connect(g); g.connect(dreamGain);
+    osc.start(t); osc.stop(t + 1.6);
+
+    var bufSize = Math.floor(ctx.sampleRate * 1);
+    var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
+    var src = track(ctx.createBufferSource());
+    src.buffer = buf;
+    var ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.15, t);
+    ng.gain.linearRampToValueAtTime(0, t + 1);
+    src.connect(ng); ng.connect(dreamGain);
+    src.start(t); src.stop(t + 1.1);
+  }
+
   function startDrone() {
-    if (!canPlay()) return;
-    droneOsc = ctx.createOscillator();
-    droneOsc.type = 'sawtooth';
-    droneOsc.frequency.value = 55;
-
-    var filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 400;
-
-    droneGain = ctx.createGain();
-    droneGain.gain.setValueAtTime(0, ctx.currentTime);
-    droneGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 2);
-
-    droneOsc.connect(filter);
-    filter.connect(droneGain);
-    droneGain.connect(ctx.destination);
-    droneOsc.start();
-    active = true;
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var o1 = track(ctx.createOscillator());
+    var o2 = track(ctx.createOscillator());
+    o1.type = 'sine'; o1.frequency.value = 55;
+    o2.type = 'sine'; o2.frequency.value = 58;
+    var g1 = ctx.createGain(); g1.gain.value = 0.08;
+    var g2 = ctx.createGain(); g2.gain.value = 0.08;
+    o1.connect(g1); g1.connect(dreamGain);
+    o2.connect(g2); g2.connect(dreamGain);
+    var lfo = track(ctx.createOscillator());
+    lfo.type = 'sine'; lfo.frequency.value = 0.07;
+    var lfoG = ctx.createGain(); lfoG.gain.value = 0.035;
+    lfo.connect(lfoG); lfoG.connect(g1.gain); lfoG.connect(g2.gain);
+    o1.start(t); o2.start(t); lfo.start(t);
   }
 
-  function stopDrone() {
-    if (droneOsc && droneGain) {
-      try {
-        droneGain.gain.cancelScheduledValues(ctx.currentTime);
-        droneGain.gain.setValueAtTime(droneGain.gain.value, ctx.currentTime);
-        droneGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
-        droneOsc.stop(ctx.currentTime + 1.1);
-      } catch(e) {}
+  function playCorrect() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var osc = track(ctx.createOscillator());
+    osc.type = 'sine'; osc.frequency.value = 880;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.2, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(g); g.connect(dreamGain);
+    osc.start(t); osc.stop(t + 0.13);
+  }
+
+  function playWrong() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var osc = track(ctx.createOscillator());
+    osc.type = 'square'; osc.frequency.value = 120;
+    var dist = makeDistortion(80);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.25, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.25);
+    osc.connect(dist); dist.connect(g); g.connect(dreamGain);
+    osc.start(t); osc.stop(t + 0.26);
+  }
+
+  function playExit() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var osc = track(ctx.createOscillator());
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(100, t);
+    osc.frequency.linearRampToValueAtTime(800, t + 1);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.15, t);
+    g.gain.linearRampToValueAtTime(0, t + 1);
+    osc.connect(g); g.connect(dreamGain);
+    osc.start(t); osc.stop(t + 1.1);
+  }
+
+  function stopAll() {
+    for (var i = 0; i < nodes.length; i++) {
+      try { nodes[i].stop(); } catch(e) {}
+      try { nodes[i].disconnect(); } catch(e) {}
     }
-    droneOsc = null;
-    droneGain = null;
-  }
-
-  // ── Glitch hit (enemy kill) ──
-  function playGlitchHit() {
-    if (!canPlay()) return;
-    var bufSize = Math.floor(ctx.sampleRate * 0.08);
-    var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-    var data = buf.getChannelData(0);
-    for (var i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
-
-    var src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.playbackRate.value = 0.5 + Math.random() * 1.5;
-
-    var g = ctx.createGain();
-    g.gain.setValueAtTime(0.25, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-
-    src.connect(g);
-    g.connect(ctx.destination);
-    src.start();
-    src.stop(ctx.currentTime + 0.1);
-  }
-
-  // ── Enemy approach warning ──
-  function startWarning() {
-    if (warningOn || !canPlay()) return;
-    warningOn = true;
-    warningOsc = ctx.createOscillator();
-    warningOsc.type = 'square';
-    warningOsc.frequency.value = 220;
-    warningGain = ctx.createGain();
-    warningGain.gain.value = 0;
-
-    warningOsc.connect(warningGain);
-    warningGain.connect(ctx.destination);
-    warningOsc.start();
-
-    var pulseState = false;
-    warningPulseInterval = setInterval(function() {
-      if (!warningGain) return;
-      pulseState = !pulseState;
-      try { warningGain.gain.setValueAtTime(pulseState ? 0.03 : 0, ctx.currentTime); }
-      catch(e) {}
-    }, 300);
-  }
-
-  function stopWarning() {
-    warningOn = false;
-    if (warningPulseInterval) { clearInterval(warningPulseInterval); warningPulseInterval = null; }
-    if (warningOsc) {
-      try { warningOsc.stop(); } catch(e) {}
-      warningOsc = null;
-    }
-    warningGain = null;
-  }
-
-  // ── Player hit (low boom) ──
-  function playPlayerHit() {
-    if (!canPlay()) return;
-    var osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = 80;
-    var g = ctx.createGain();
-    g.gain.setValueAtTime(0.3, ctx.currentTime);
-    g.gain.setValueAtTime(0.3, ctx.currentTime + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-  }
-
-  // ── Timer beep (final 10s) ──
-  function playTimerBeep() {
-    if (!canPlay()) return;
-    var osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = 880;
-    var g = ctx.createGain();
-    g.gain.setValueAtTime(0.15, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.06);
-  }
-
-  // ── Snap-back (white noise burst) ──
-  function playSnapBack() {
-    if (!canPlay()) return;
-    var bufSize = Math.floor(ctx.sampleRate * 0.2);
-    var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-    var data = buf.getChannelData(0);
-    for (var i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
-
-    var src = ctx.createBufferSource();
-    src.buffer = buf;
-    var g = ctx.createGain();
-    g.gain.setValueAtTime(0.3, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-
-    src.connect(g);
-    g.connect(ctx.destination);
-    src.start();
-    src.stop(ctx.currentTime + 0.25);
-  }
-
-  // ── Cleanup ──
-  function cleanup() {
-    active = false;
-    stopDrone();
-    stopWarning();
+    nodes = [];
+    if (dreamGain) { try { dreamGain.disconnect(); } catch(e) {} dreamGain = null; }
   }
 
   return {
+    startEntry: startEntry,
     startDrone: startDrone,
-    stopDrone: stopDrone,
-    playGlitchHit: playGlitchHit,
-    startWarning: startWarning,
-    stopWarning: stopWarning,
-    playPlayerHit: playPlayerHit,
-    playTimerBeep: playTimerBeep,
-    playSnapBack: playSnapBack,
-    cleanup: cleanup
+    playCorrect: playCorrect,
+    playWrong: playWrong,
+    playExit: playExit,
+    stopAll: stopAll
   };
 }
 </script>
