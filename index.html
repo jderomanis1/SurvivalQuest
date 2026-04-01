@@ -5083,19 +5083,22 @@ function fetchDreamIntro(triggerType, callback) {
 }
 
 function fetchDreamDebrief(outcome, callback) {
-  var fallback = 'The city lets you back. For now.';
+  var tier = outcome.tier || 'neutral';
+  var fallback = tier === 'good' ? 'The static clears. You remember who you are.'
+    : tier === 'bad' ? 'Something followed you back from the dream.'
+    : 'The dream dissolves. The city remains.';
+  var pName = character.name || 'the survivor';
   var body = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 60,
     system: 'You write horror survival game narration. Terse. Never explain.',
     messages: [{
       role: 'user',
-      content: 'Dark Commute survival game. Player just emerged from a 60-second ' +
-        'psychic combat sequence in a destroyed city dreamscape. ' +
-        'Result: ' + (outcome.survived ? 'Survived' : 'Overwhelmed') +
-        ', ' + outcome.kills + ' threats neutralized. ' +
-        'Write 1–2 sentences that the narrator delivers as they return to the terminal. ' +
-        'Tone: haunted, matter-of-fact. Max 20 words.'
+      content: 'Write 1 sentence of post-dream narration for Dark Commute. ' +
+        pName + ' just woke from a nightmare on day ' + (gameState.day || 1) + '. ' +
+        'They scored ' + (outcome.score || 0) + ' in the dream — result: ' + tier + '. ' +
+        'Their morale is now ' + (gameState.morale || 50) + '. ' +
+        'Write it as if the CRT terminal is narrating. Surreal, terse, unsettling. Under 20 words. No quotes.'
     }]
   });
 
