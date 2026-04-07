@@ -5044,6 +5044,7 @@ function generateDreamMap() {
 function castRays(player, map) {
   var W = 320, FOV = Math.PI / 3; // 60°
   var rays = [];
+  var depthBuffer = new Float32Array(W);
   for (var col = 0; col < W; col++) {
     var rayAngle = (player.angle - FOV / 2) + (col / W) * FOV;
     var rayDirX = Math.cos(rayAngle);
@@ -5097,13 +5098,17 @@ function castRays(player, map) {
     else            wallX = player.x + perpDist * rayDirX;
     wallX -= Math.floor(wallX);
 
+    depthBuffer[col] = perpDist;
     rays.push({ distance: perpDist, wallType: wallType, side: side, textureX: wallX });
   }
+  rays.depthBuffer = depthBuffer;
   return rays;
 }
 
-function renderFrame(ctx, rays, player) {
+function renderFrame(ctx, rays, player, enemies) {
   var CW = 320, CH = 200;
+  var FOV = Math.PI / 3;
+  var depthBuffer = rays.depthBuffer;
 
   // Sky
   ctx.fillStyle = '#1a1a1a';
@@ -5127,6 +5132,70 @@ function renderFrame(ctx, rays, player) {
     ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
     ctx.fillRect(col, drawStart, 1, lineH);
   }
+
+  // ── Sprite rendering ──
+  if (!enemies || !enemies.length) return;
+
+  // Sort enemies farthest-first so closer ones overdraw
+  var sorted = enemies.filter(function(e) { return e.alive; }).map(function(e) {
+    var dx = e.x - player.x, dy = e.y - player.y;
+    return { e: e, dist2: dx*dx + dy*dy };
+  });
+  sorted.sort(function(a, b) { return b.dist2 - a.dist2; });
+
+  for (var si = 0; si < sorted.length; si++) {
+    var e = sorted[si].e;
+    var dx = e.x - player.x;
+    var dy = e.y - player.y;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 0.1) continue;
+
+    // Angle of sprite relative to player direction
+    var spriteAngle = Math.atan2(dy, dx) - player.angle;
+    // Normalise to [-π, π]
+    while (spriteAngle >  Math.PI) spriteAngle -= 2 * Math.PI;
+    while (spriteAngle < -Math.PI) spriteAngle += 2 * Math.PI;
+
+    // Outside FOV (add a little buffer)
+    if (Math.abs(spriteAngle) > FOV / 2 + 0.1) continue;
+
+    // Project
+    var spriteH = Math.min(CH, Math.floor(CH / dist));
+    var spriteW = spriteH; // square sprite
+    var spriteTop = Math.floor((CH - spriteH) / 2);
+
+    // Screen X center: map spriteAngle to column
+    var screenCX = Math.floor(((spriteAngle + FOV / 2) / FOV) * CW);
+
+    var colStart = screenCX - Math.floor(spriteW / 2);
+    var colEnd   = screenCX + Math.floor(spriteW / 2);
+
+    for (var sc = colStart; sc < colEnd; sc++) {
+      if (sc < 0 || sc >= CW) continue;
+      if (depthBuffer[sc] < dist) continue; // occluded by wall
+
+      // Normalised position within the sprite (0..1)
+      var tx = (sc - colStart) / spriteW;
+
+      // Body: lower 60% of sprite height
+      var bodyTop    = spriteTop + Math.floor(spriteH * 0.35);
+      var bodyBottom = spriteTop + spriteH;
+      // Head: upper 35%
+      var headTop    = spriteTop;
+      var headBottom = spriteTop + Math.floor(spriteH * 0.35);
+
+      ctx.fillStyle = '#2d4a1a';
+      ctx.fillRect(sc, bodyTop, 1, bodyBottom - bodyTop);
+
+      ctx.fillStyle = '#3d5a2a';
+      ctx.fillRect(sc, headTop, 1, headBottom - headTop);
+
+      // Eyes: two columns ~30% and ~70% across head, vertically centred in head
+      var eyeY = headTop + Math.floor((headBottom - headTop) * 0.4);
+      if (tx > 0.25 && tx < 0.38) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
+      if (tx > 0.62 && tx < 0.75) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
+    }
+  }
 }
 
 function runDreamGame(onComplete) {
@@ -5136,6 +5205,22 @@ function runDreamGame(onComplete) {
 
   var map = generateDreamMap();
   var player = { x: 1.5, y: 1.5, angle: 0, moveSpeed: 0.06, rotSpeed: 0.04 };
+
+  // Spawn 5-7 enemies in empty cells at least 3 cells from (1,1)
+  var enemies = [];
+  var numEnemies = 5 + Math.floor(Math.random() * 3);
+  var spawnAttempts = 0;
+  while (enemies.length < numEnemies && spawnAttempts < 200) {
+    spawnAttempts++;
+    var ex = 1 + Math.floor(Math.random() * (map[0].length - 2));
+    var ey = 1 + Math.floor(Math.random() * (map.length - 2));
+    if (map[ey][ex] !== 0) continue;
+    var dist = Math.abs(ex - 1) + Math.abs(ey - 1);
+    if (dist < 3) continue;
+    enemies.push({ x: ex + 0.5, y: ey + 0.5, alive: true, speed: 0.02 });
+  }
+
+  var enemyTouchedPlayer = false;
 
   var DURATION = 30000;
   var startTime = Date.now();
@@ -5234,9 +5319,32 @@ function runDreamGame(onComplete) {
       return;
     }
 
+    // Enemy movement
+    for (var ei = 0; ei < enemies.length; ei++) {
+      var en = enemies[ei];
+      if (!en.alive) continue;
+      var edx = player.x - en.x, edy = player.y - en.y;
+      var eDist = Math.sqrt(edx * edx + edy * edy);
+      if (eDist < 0.5) {
+        enemyTouchedPlayer = true; // flag for future combat prompt
+        continue;
+      }
+      var eAngle = Math.atan2(edy, edx);
+      var emx = Math.cos(eAngle) * en.speed;
+      var emy = Math.sin(eAngle) * en.speed;
+      var enx = en.x + emx, eny = en.y + emy;
+      // Wall collision for enemy (same per-axis check as player)
+      if (map[Math.floor(en.y)][Math.floor(enx)] === 0 || map[Math.floor(en.y)][Math.floor(enx)] === 3) {
+        en.x = enx;
+      }
+      if (map[Math.floor(eny)][Math.floor(en.x)] === 0 || map[Math.floor(eny)][Math.floor(en.x)] === 3) {
+        en.y = eny;
+      }
+    }
+
     // Render
     var rays = castRays(player, map);
-    renderFrame(ctx, rays, player);
+    renderFrame(ctx, rays, player, enemies);
 
     rafId = requestAnimationFrame(loop);
   }
