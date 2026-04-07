@@ -5285,6 +5285,7 @@ function runDreamGame(onComplete) {
   var killCount  = 0;
   var playerHP   = 100;
   var damageTimer = 0;
+  var frameCount = 0;
   var lastRays   = null;
 
   // Touch joystick state
@@ -5378,7 +5379,7 @@ function runDreamGame(onComplete) {
     weapon.firing  = true;
     weapon.cooldown = 15;
     weapon.ammo--;
-    if (dreamAudioRef && dreamAudioRef.playCorrect) dreamAudioRef.playCorrect();
+    if (dreamAudioRef && dreamAudioRef.playShotgun) dreamAudioRef.playShotgun();
 
     var FOV = Math.PI / 3, CW = 320, CH = 200;
     for (var i = 0; i < enemies.length; i++) {
@@ -5402,6 +5403,7 @@ function runDreamGame(onComplete) {
       if (colStart <= 160 && colEnd >= 160 && depthOk) {
         en.alive = false;
         killCount++;
+        if (dreamAudioRef && dreamAudioRef.playEnemyDeath) dreamAudioRef.playEnemyDeath();
         break; // one kill per shot
       }
     }
@@ -5509,9 +5511,16 @@ function runDreamGame(onComplete) {
       player.y = moveY > 0 ? Math.floor(ny) - MARGIN : Math.ceil(ny) + MARGIN;
     }
 
+    // Footstep sound every 20 frames while moving
+    frameCount++;
+    if ((moveX !== 0 || moveY !== 0) && frameCount % 20 === 0) {
+      if (dreamAudioRef && dreamAudioRef.playFootstep) dreamAudioRef.playFootstep();
+    }
+
     // Check exit
     var cellX = Math.floor(player.x), cellY = Math.floor(player.y);
     if (map[cellY] && map[cellY][cellX] === 3) {
+      if (dreamAudioRef && dreamAudioRef.playExitFound) dreamAudioRef.playExitFound();
       var eScore = Math.min(100, 60 + killCount * 5);
       var eTier  = eScore >= 70 ? 'good' : 'neutral';
       finish({ score: eScore, tier: eTier, hits: killCount, misses: 0, penalties: 0,
@@ -5530,6 +5539,7 @@ function runDreamGame(onComplete) {
       if (eDist < 0.5) {
         if (damageTimer % 60 === 0) {
           playerHP -= 15;
+          if (dreamAudioRef && dreamAudioRef.playPlayerHurt) dreamAudioRef.playPlayerHurt();
           hitFlash.classList.remove('flash-bad');
           void hitFlash.offsetWidth;
           hitFlash.classList.add('flash-bad');
@@ -5811,6 +5821,112 @@ function initDreamAudio() {
     osc.start(t); osc.stop(t + 1.1);
   }
 
+  function playShotgun() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    // Noise burst through bandpass at 800Hz
+    var bufSize = Math.floor(ctx.sampleRate * 0.1);
+    var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
+    var src = track(ctx.createBufferSource());
+    src.buffer = buf;
+    var bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 800; bp.Q.value = 1;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.3, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.1);
+    src.connect(bp); bp.connect(g); g.connect(dreamGain);
+    src.start(t); src.stop(t + 0.11);
+    // Low thud
+    var thud = track(ctx.createOscillator());
+    thud.type = 'sine'; thud.frequency.value = 60;
+    var tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.3, t);
+    tg.gain.linearRampToValueAtTime(0, t + 0.08);
+    thud.connect(tg); tg.connect(dreamGain);
+    thud.start(t); thud.stop(t + 0.09);
+  }
+
+  function playEnemyDeath() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var osc = track(ctx.createOscillator());
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.linearRampToValueAtTime(80, t + 0.3);
+    var dist = makeDistortion(40);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.2, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.3);
+    osc.connect(dist); dist.connect(g); g.connect(dreamGain);
+    osc.start(t); osc.stop(t + 0.32);
+  }
+
+  function playEnemyHit() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var osc = track(ctx.createOscillator());
+    osc.type = 'square'; osc.frequency.value = 200;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.15, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.05);
+    osc.connect(g); g.connect(dreamGain);
+    osc.start(t); osc.stop(t + 0.06);
+  }
+
+  function playPlayerHurt() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    // Red noise burst
+    var bufSize = Math.floor(ctx.sampleRate * 0.15);
+    var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
+    var src = track(ctx.createBufferSource());
+    src.buffer = buf;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.25, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.15);
+    src.connect(g); g.connect(dreamGain);
+    src.start(t); src.stop(t + 0.16);
+    // Alarm sine
+    var osc = track(ctx.createOscillator());
+    osc.type = 'sine'; osc.frequency.value = 100;
+    var og = ctx.createGain();
+    og.gain.setValueAtTime(0.25, t);
+    og.gain.linearRampToValueAtTime(0, t + 0.15);
+    osc.connect(og); og.connect(dreamGain);
+    osc.start(t); osc.stop(t + 0.16);
+  }
+
+  function playFootstep() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var osc = track(ctx.createOscillator());
+    osc.type = 'sine'; osc.frequency.value = 800;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.05, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.02);
+    osc.connect(g); g.connect(dreamGain);
+    osc.start(t); osc.stop(t + 0.022);
+  }
+
+  function playExitFound() {
+    if (!ok()) return;
+    var ctx = getAudioCtx(), t = ctx.currentTime;
+    var osc = track(ctx.createOscillator());
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.linearRampToValueAtTime(600,  t + 0.2);
+    osc.frequency.linearRampToValueAtTime(1200, t + 0.5);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.2, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.5);
+    osc.connect(g); g.connect(dreamGain);
+    osc.start(t); osc.stop(t + 0.52);
+  }
+
   function stopAll() {
     for (var i = 0; i < nodes.length; i++) {
       try { nodes[i].stop(); } catch(e) {}
@@ -5821,12 +5937,18 @@ function initDreamAudio() {
   }
 
   return {
-    startEntry: startEntry,
-    startDrone: startDrone,
-    playCorrect: playCorrect,
-    playWrong: playWrong,
-    playExit: playExit,
-    stopAll: stopAll
+    startEntry:    startEntry,
+    startDrone:    startDrone,
+    playCorrect:   playCorrect,
+    playWrong:     playWrong,
+    playExit:      playExit,
+    playShotgun:   playShotgun,
+    playEnemyDeath: playEnemyDeath,
+    playEnemyHit:  playEnemyHit,
+    playPlayerHurt: playPlayerHurt,
+    playFootstep:  playFootstep,
+    playExitFound: playExitFound,
+    stopAll:       stopAll
   };
 }
 </script>
