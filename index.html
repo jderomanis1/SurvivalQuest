@@ -1599,6 +1599,38 @@
     @keyframes dreamHueRotate { to { filter: hue-rotate(360deg); } }
 
     #dreamOverlay.flash-out { animation: dreamFlashOut 0.6s forwards; }
+    #dreamOverlay.touch-active { touch-action: none; }
+
+    #dreamControls { display: none; position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+
+    #dreamJoystick {
+      position: absolute; bottom: 20px; left: 20px;
+      width: 120px; height: 120px; pointer-events: auto;
+    }
+    #dreamJoystickOuter {
+      position: absolute; inset: 0; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.25); box-sizing: border-box;
+    }
+    #dreamJoystickNub {
+      position: absolute; width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(255,255,255,0.25); border: 2px solid rgba(255,255,255,0.5);
+      top: 50%; left: 50%; transform: translate(-50%,-50%);
+      transition: none; box-sizing: border-box;
+    }
+
+    #dreamFireBtn {
+      position: absolute; bottom: 30px; right: 20px;
+      width: 80px; height: 80px; border-radius: 50%; pointer-events: auto;
+      background: rgba(255,0,0,0.3); border: 2px solid rgba(255,0,0,0.6);
+      color: #ff4444; font-family: 'VT323', monospace; font-size: 18px;
+      cursor: pointer; touch-action: manipulation;
+      transition: transform 0.08s, background 0.08s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #dreamFireBtn.pressed {
+      transform: scale(0.9);
+      background: rgba(255,0,0,0.6);
+    }
 
   </style>
 </head>
@@ -1983,6 +2015,13 @@
         <div id="dreamIntroSub">REALITY FRACTURING — BRACE FOR IMPACT</div>
       </div>
       <canvas id="dreamCanvas" width="320" height="200" style="width:100%;height:100%;image-rendering:pixelated;position:absolute;inset:0;z-index:1;"></canvas>
+      <div id="dreamControls">
+        <div id="dreamJoystick">
+          <div id="dreamJoystickOuter"></div>
+          <div id="dreamJoystickNub"></div>
+        </div>
+        <button id="dreamFireBtn">FIRE</button>
+      </div>
       <div id="dreamHUD" style="display:none;">
         <div id="dreamTimerBar"><div id="dreamTimerFill"></div></div>
         <div id="dreamScore">SIGNAL: 0</div>
@@ -5248,6 +5287,11 @@ function runDreamGame(onComplete) {
   var damageTimer = 0;
   var lastRays   = null;
 
+  // Touch joystick state
+  var joyActive  = false;
+  var joyOriginX = 0, joyOriginY = 0;
+  var joyDX = 0, joyDY = 0; // normalized -1..1 after capping
+
   var DURATION = 30000;
   var startTime = Date.now();
   var timerFill = document.getElementById('dreamTimerFill');
@@ -5256,11 +5300,77 @@ function runDreamGame(onComplete) {
   var hitFlash  = document.getElementById('dreamHitFlash');
   var hud       = document.getElementById('dreamHUD');
   var crt       = document.querySelector('.crt');
+  var controls  = document.getElementById('dreamControls');
+  var joyZone   = document.getElementById('dreamJoystick');
+  var joyNub    = document.getElementById('dreamJoystickNub');
+  var fireBtn   = document.getElementById('dreamFireBtn');
+  var overlay   = document.getElementById('dreamOverlay');
+  var isTouchDevice = ('ontouchstart' in window);
 
   hud.style.display = 'flex';
   timerFill.style.width = '100%';
   scoreEl.textContent = 'KILLS: 0 / ' + numEnemies;
   crt.classList.add('dreaming');
+
+  // ── Touch controls setup ──
+  if (isTouchDevice) {
+    controls.style.display = 'block';
+    canvas.style.cursor = 'none';
+    overlay.classList.add('touch-active');
+
+    // Joystick touch handlers
+    joyZone.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      var t = e.changedTouches[0];
+      var rect = joyZone.getBoundingClientRect();
+      joyOriginX = t.clientX - rect.left;
+      joyOriginY = t.clientY - rect.top;
+      joyActive = true;
+    }, { passive: false });
+
+    joyZone.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      if (!joyActive) return;
+      var t = e.changedTouches[0];
+      var rect = joyZone.getBoundingClientRect();
+      var rawX = (t.clientX - rect.left) - joyOriginX;
+      var rawY = (t.clientY - rect.top)  - joyOriginY;
+      var MAX_R = 40;
+      var mag = Math.sqrt(rawX * rawX + rawY * rawY);
+      if (mag > MAX_R) { rawX = rawX / mag * MAX_R; rawY = rawY / mag * MAX_R; }
+      joyDX = rawX / MAX_R;
+      joyDY = rawY / MAX_R;
+      // Move nub visually
+      var cx = 60, cy = 60; // center of 120×120 zone
+      joyNub.style.left = (cx + rawX - 22) + 'px';
+      joyNub.style.top  = (cy + rawY - 22) + 'px';
+      joyNub.style.transform = 'none';
+    }, { passive: false });
+
+    function joyEnd(e) {
+      e.preventDefault();
+      joyActive = false;
+      joyDX = 0; joyDY = 0;
+      joyNub.style.left = '50%'; joyNub.style.top = '50%';
+      joyNub.style.transform = 'translate(-50%,-50%)';
+    }
+    joyZone.addEventListener('touchend',    joyEnd, { passive: false });
+    joyZone.addEventListener('touchcancel', joyEnd, { passive: false });
+
+    // Fire button
+    fireBtn.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      fireBtn.classList.add('pressed');
+      tryShoot();
+    }, { passive: false });
+    fireBtn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      fireBtn.classList.remove('pressed');
+    }, { passive: false });
+
+    // Block page scroll on overlay touches
+    overlay.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
+  }
 
   // ── Hitscan shooting ──
   function tryShoot() {
@@ -5320,6 +5430,8 @@ function runDreamGame(onComplete) {
     document.removeEventListener('keyup',    onKeyUp);
     canvas.removeEventListener('mousedown',  onMouseDown);
     hud.style.display = 'none';
+    controls.style.display = 'none';
+    overlay.classList.remove('touch-active');
     crt.classList.remove('dreaming');
 
     if (dreamAudioRef) {
@@ -5373,6 +5485,13 @@ function runDreamGame(onComplete) {
     if (keys['KeyS']     || keys['ArrowDown'])  { moveX -= cos * player.moveSpeed; moveY -= sin * player.moveSpeed; }
     if (keys['KeyA']     || keys['ArrowLeft'])  rot -= player.rotSpeed;
     if (keys['KeyD']     || keys['ArrowRight']) rot += player.rotSpeed;
+
+    // Joystick input (additive with keyboard)
+    if (joyActive) {
+      moveX -= joyDY * cos * player.moveSpeed;
+      moveY -= joyDY * sin * player.moveSpeed;
+      rot   += joyDX * player.rotSpeed;
+    }
 
     player.angle += rot;
 
