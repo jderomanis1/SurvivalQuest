@@ -5105,7 +5105,7 @@ function castRays(player, map) {
   return rays;
 }
 
-function renderFrame(ctx, rays, player, enemies) {
+function renderFrame(ctx, rays, player, enemies, weapon) {
   var CW = 320, CH = 200;
   var FOV = Math.PI / 3;
   var depthBuffer = rays.depthBuffer;
@@ -5196,6 +5196,28 @@ function renderFrame(ctx, rays, player, enemies) {
       if (tx > 0.62 && tx < 0.75) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
     }
   }
+
+  // ── Weapon HUD ──
+  if (!weapon) return;
+  var cx = 160;
+  // Muzzle flash (3-frame burst) — drawn behind barrel so it peeks out
+  if (weapon.firing) {
+    ctx.fillStyle = '#ffdd00';
+    ctx.fillRect(cx - 14, 100, 12, 20);
+    ctx.fillRect(cx +  2, 100, 12, 20);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(cx -  6,  95, 12, 12);
+  }
+  // Barrel: dark gray, 16px wide, 65px tall
+  ctx.fillStyle = '#444444';
+  ctx.fillRect(cx - 8, 115, 16, 65);
+  // Stock: brown, 40px wide, 30px tall
+  ctx.fillStyle = '#6b4a2a';
+  ctx.fillRect(cx - 20, 165, 40, 35);
+  // Ammo counter
+  ctx.font = '10px monospace';
+  ctx.fillStyle = '#00ff41';
+  ctx.fillText('AMMO: ' + weapon.ammo, 242, 195);
 }
 
 function runDreamGame(onComplete) {
@@ -5215,41 +5237,88 @@ function runDreamGame(onComplete) {
     var ex = 1 + Math.floor(Math.random() * (map[0].length - 2));
     var ey = 1 + Math.floor(Math.random() * (map.length - 2));
     if (map[ey][ex] !== 0) continue;
-    var dist = Math.abs(ex - 1) + Math.abs(ey - 1);
-    if (dist < 3) continue;
+    var spDist = Math.abs(ex - 1) + Math.abs(ey - 1);
+    if (spDist < 3) continue;
     enemies.push({ x: ex + 0.5, y: ey + 0.5, alive: true, speed: 0.02 });
   }
 
-  var enemyTouchedPlayer = false;
+  var weapon     = { type: 'shotgun', ammo: 12, cooldown: 0, firing: false };
+  var killCount  = 0;
+  var playerHP   = 100;
+  var damageTimer = 0;
+  var lastRays   = null;
 
   var DURATION = 30000;
   var startTime = Date.now();
   var timerFill = document.getElementById('dreamTimerFill');
-  var scoreEl = document.getElementById('dreamScore');
-  var msgEl = document.getElementById('dreamMessage');
-  var hud = document.getElementById('dreamHUD');
-  var crt = document.querySelector('.crt');
+  var scoreEl   = document.getElementById('dreamScore');
+  var msgEl     = document.getElementById('dreamMessage');
+  var hitFlash  = document.getElementById('dreamHitFlash');
+  var hud       = document.getElementById('dreamHUD');
+  var crt       = document.querySelector('.crt');
 
   hud.style.display = 'flex';
   timerFill.style.width = '100%';
-  scoreEl.textContent = 'FIND THE EXIT';
+  scoreEl.textContent = 'KILLS: 0 / ' + numEnemies;
   crt.classList.add('dreaming');
 
-  var keys = {};
-  function onKeyDown(e) { keys[e.code] = true; }
-  function onKeyUp(e)   { keys[e.code] = false; }
-  document.addEventListener('keydown', onKeyDown);
-  document.addEventListener('keyup',   onKeyUp);
+  // ── Hitscan shooting ──
+  function tryShoot() {
+    if (weapon.cooldown > 0 || weapon.ammo <= 0) return;
+    weapon.firing  = true;
+    weapon.cooldown = 15;
+    weapon.ammo--;
+    if (dreamAudioRef && dreamAudioRef.playCorrect) dreamAudioRef.playCorrect();
 
-  var rafId = null;
+    var FOV = Math.PI / 3, CW = 320, CH = 200;
+    for (var i = 0; i < enemies.length; i++) {
+      var en = enemies[i];
+      if (!en.alive) continue;
+      var dx = en.x - player.x, dy = en.y - player.y;
+      var eDist = Math.sqrt(dx * dx + dy * dy);
+      if (eDist < 0.1) continue;
+
+      var sa = Math.atan2(dy, dx) - player.angle;
+      while (sa >  Math.PI) sa -= 2 * Math.PI;
+      while (sa < -Math.PI) sa += 2 * Math.PI;
+      if (Math.abs(sa) > FOV / 2 + 0.1) continue;
+
+      var screenCX = Math.floor(((sa + FOV / 2) / FOV) * CW);
+      var spriteH  = Math.min(CH, Math.floor(CH / eDist));
+      var half     = Math.floor(spriteH / 2);
+      var colStart = screenCX - half, colEnd = screenCX + half;
+
+      var depthOk = !lastRays || lastRays.depthBuffer[160] >= eDist;
+      if (colStart <= 160 && colEnd >= 160 && depthOk) {
+        en.alive = false;
+        killCount++;
+        break; // one kill per shot
+      }
+    }
+  }
+
+  var keys = {};
+  function onKeyDown(e) {
+    keys[e.code] = true;
+    if (e.code === 'Space') { e.preventDefault(); tryShoot(); }
+  }
+  function onKeyUp(e)    { keys[e.code] = false; }
+  function onMouseDown(e){ if (e.button === 0) tryShoot(); }
+
+  document.addEventListener('keydown',  onKeyDown);
+  document.addEventListener('keyup',    onKeyUp);
+  canvas.addEventListener('mousedown',  onMouseDown);
+
+  var rafId    = null;
   var finished = false;
 
   function finish(outcome) {
     if (finished) return;
     finished = true;
     if (rafId) cancelAnimationFrame(rafId);
-    document.removeEventListener('keydown', onKeyDown);
-    document.removeEventListener('keyup',   onKeyUp);
+    document.removeEventListener('keydown',  onKeyDown);
+    document.removeEventListener('keyup',    onKeyUp);
+    canvas.removeEventListener('mousedown',  onMouseDown);
     hud.style.display = 'none';
     crt.classList.remove('dreaming');
 
@@ -5261,7 +5330,9 @@ function runDreamGame(onComplete) {
       }, 1200);
     }
 
-    var msg = outcome.tier === 'good' ? 'EXIT FOUND' : 'SIGNAL LOST';
+    var msg = outcome.tier === 'good' ? 'EXIT FOUND'
+            : outcome.tier === 'bad'  ? 'YOU DIED'
+            : 'SIGNAL LOST';
     msgEl.textContent = msg;
     msgEl.classList.add('active');
     setTimeout(function() {
@@ -5281,29 +5352,36 @@ function runDreamGame(onComplete) {
     timerFill.style.width = pct + '%';
 
     if (elapsed >= DURATION) {
-      finish({ score: 40, tier: 'neutral', hits: 0, misses: 0, penalties: 0, statBonus: { morale: 3, energy: 0 } });
+      var tScore = Math.min(100, 20 + killCount * 3);
+      var tTier  = killCount >= 3 ? 'neutral' : 'bad';
+      finish({ score: tScore, tier: tTier, hits: killCount, misses: 0, penalties: 0,
+               statBonus: tTier === 'neutral' ? { morale: 3, energy: 0 } : { morale: -5, energy: -3 } });
       return;
+    }
+
+    // Weapon cooldown
+    if (weapon.cooldown > 0) {
+      weapon.cooldown--;
+      if (weapon.cooldown <= 12) weapon.firing = false;
     }
 
     // Input
     var moveX = 0, moveY = 0, rot = 0;
     var cos = Math.cos(player.angle), sin = Math.sin(player.angle);
 
-    if (keys['KeyW']    || keys['ArrowUp'])    { moveX += cos * player.moveSpeed; moveY += sin * player.moveSpeed; }
-    if (keys['KeyS']    || keys['ArrowDown'])  { moveX -= cos * player.moveSpeed; moveY -= sin * player.moveSpeed; }
-    if (keys['KeyA']    || keys['ArrowLeft'])  rot -= player.rotSpeed;
-    if (keys['KeyD']    || keys['ArrowRight']) rot += player.rotSpeed;
+    if (keys['KeyW']     || keys['ArrowUp'])    { moveX += cos * player.moveSpeed; moveY += sin * player.moveSpeed; }
+    if (keys['KeyS']     || keys['ArrowDown'])  { moveX -= cos * player.moveSpeed; moveY -= sin * player.moveSpeed; }
+    if (keys['KeyA']     || keys['ArrowLeft'])  rot -= player.rotSpeed;
+    if (keys['KeyD']     || keys['ArrowRight']) rot += player.rotSpeed;
 
     player.angle += rot;
 
-    // Wall collision (check each axis independently, allow sliding)
-    var nx = player.x + moveX;
-    var ny = player.y + moveY;
+    // Wall collision
+    var nx = player.x + moveX, ny = player.y + moveY;
     var MARGIN = 0.25;
     if (map[Math.floor(player.y)][Math.floor(nx)] === 0 || map[Math.floor(player.y)][Math.floor(nx)] === 3) {
       player.x = nx;
     } else if (moveX !== 0) {
-      // push to wall edge
       player.x = moveX > 0 ? Math.floor(nx) - MARGIN : Math.ceil(nx) + MARGIN;
     }
     if (map[Math.floor(ny)][Math.floor(player.x)] === 0 || map[Math.floor(ny)][Math.floor(player.x)] === 3) {
@@ -5315,36 +5393,50 @@ function runDreamGame(onComplete) {
     // Check exit
     var cellX = Math.floor(player.x), cellY = Math.floor(player.y);
     if (map[cellY] && map[cellY][cellX] === 3) {
-      finish({ score: 90, tier: 'good', hits: 0, misses: 0, penalties: 0, statBonus: { morale: 8, energy: 5 } });
+      var eScore = Math.min(100, 60 + killCount * 5);
+      var eTier  = eScore >= 70 ? 'good' : 'neutral';
+      finish({ score: eScore, tier: eTier, hits: killCount, misses: 0, penalties: 0,
+               statBonus: eTier === 'good' ? { morale: 8, energy: 5 } : { morale: 3, energy: 0 } });
       return;
     }
 
-    // Enemy movement
+    // Enemy movement + damage
+    damageTimer++;
     for (var ei = 0; ei < enemies.length; ei++) {
       var en = enemies[ei];
       if (!en.alive) continue;
       var edx = player.x - en.x, edy = player.y - en.y;
       var eDist = Math.sqrt(edx * edx + edy * edy);
+
       if (eDist < 0.5) {
-        enemyTouchedPlayer = true; // flag for future combat prompt
+        if (damageTimer % 60 === 0) {
+          playerHP -= 15;
+          hitFlash.classList.remove('flash-bad');
+          void hitFlash.offsetWidth;
+          hitFlash.classList.add('flash-bad');
+          setTimeout(function() { hitFlash.classList.remove('flash-bad'); }, 200);
+          if (playerHP <= 0) {
+            finish({ score: Math.min(100, killCount * 5), tier: 'bad',
+                     hits: killCount, misses: 0, penalties: 0, statBonus: { morale: -5, energy: -3 } });
+            return;
+          }
+        }
         continue;
       }
+
       var eAngle = Math.atan2(edy, edx);
-      var emx = Math.cos(eAngle) * en.speed;
-      var emy = Math.sin(eAngle) * en.speed;
-      var enx = en.x + emx, eny = en.y + emy;
-      // Wall collision for enemy (same per-axis check as player)
-      if (map[Math.floor(en.y)][Math.floor(enx)] === 0 || map[Math.floor(en.y)][Math.floor(enx)] === 3) {
-        en.x = enx;
-      }
-      if (map[Math.floor(eny)][Math.floor(en.x)] === 0 || map[Math.floor(eny)][Math.floor(en.x)] === 3) {
-        en.y = eny;
-      }
+      var enx = en.x + Math.cos(eAngle) * en.speed;
+      var eny = en.y + Math.sin(eAngle) * en.speed;
+      if (map[Math.floor(en.y)][Math.floor(enx)] === 0 || map[Math.floor(en.y)][Math.floor(enx)] === 3) en.x = enx;
+      if (map[Math.floor(eny)][Math.floor(en.x)] === 0 || map[Math.floor(eny)][Math.floor(en.x)] === 3) en.y = eny;
     }
 
+    // Update HUD score
+    scoreEl.textContent = 'KILLS: ' + killCount + ' / ' + numEnemies;
+
     // Render
-    var rays = castRays(player, map);
-    renderFrame(ctx, rays, player, enemies);
+    lastRays = castRays(player, map);
+    renderFrame(ctx, lastRays, player, enemies, weapon);
 
     rafId = requestAnimationFrame(loop);
   }
