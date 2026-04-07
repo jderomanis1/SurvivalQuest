@@ -428,8 +428,28 @@
       color: #888;
       font-size: 0.68em;
       letter-spacing: 1px;
-      margin-bottom: 20px;
+      margin-bottom: 14px;
       font-style: italic;
+    }
+
+    .death-journey {
+      color: #555;
+      font-size: 0.6em;
+      letter-spacing: 1px;
+      margin: 10px 0 14px;
+      line-height: 2.1;
+    }
+
+    .death-epitaph {
+      font-style: italic;
+      color: var(--green);
+      opacity: 0.8;
+      font-size: 0.63em;
+      letter-spacing: 1px;
+      max-width: 80%;
+      margin: 0 auto 20px;
+      line-height: 1.7;
+      animation: fadeIn 2s ease-in both;
     }
 
     .restart-btn {
@@ -1977,12 +1997,14 @@
     <!-- DEATH SCREEN -->
     <div id="deathScreen">
       <div class="death-title">YOU DIED</div>
+      <div class="death-journey" id="deathJourney"></div>
       <div class="death-subtitle">
         SURVIVAL RATING: <span id="deathRating">POOR</span><br>
         DAYS SURVIVED: <span id="deathDays">0</span><br>
         FINAL SCORE: <span id="deathScore">0</span> / 500
       </div>
       <div class="death-cause" id="deathCause">cause of death: unknown</div>
+      <div class="death-epitaph" id="deathEpitaph">...</div>
       <button class="restart-btn" onclick="restartGame()">[ RESTART ]</button>
     </div>
 
@@ -3918,13 +3940,102 @@ function checkGameOver(parsed) {
 
 function showDeath(cause, days) {
   soundDeath();
+  var daysFinal = days || gameState.day;
+
   document.getElementById('gameScreen').style.display   = 'none';
   document.getElementById('deathCause').textContent     = 'cause of death: ' + cause;
-  document.getElementById('deathDays').textContent      = days || gameState.day;
+  document.getElementById('deathDays').textContent      = daysFinal;
   document.getElementById('deathScore').textContent     = currentScore;
   var ratings = ['POOR','POOR','FAIR','FAIR','GOOD','GOOD','GREAT','LEGENDARY'];
-  document.getElementById('deathRating').textContent    = ratings[Math.min(days||1, ratings.length-1)];
+  document.getElementById('deathRating').textContent    = ratings[Math.min(daysFinal, ratings.length - 1)];
+
+  // ── Journey recap ──────────────────────────────
+  var location = (gameState.location || 'unknown')
+    .replace(/\\n/g, '\n').split('\n')[0].trim();
+  var inv = (gameState.inventory && gameState.inventory.length)
+    ? gameState.inventory.join(', ')
+    : 'nothing';
+  var actions = Math.floor(chatLog.length / 2);
+  var traits  = (character.traits && character.traits.length)
+    ? character.traits.join(', ')
+    : 'none';
+
+  var journeyEl = document.getElementById('deathJourney');
+  if (journeyEl) {
+    journeyEl.innerHTML =
+      'ACTIONS TAKEN: ' + actions + '<br>' +
+      'LAST LOCATION: ' + location + '<br>' +
+      'CARRIED: ' + inv;
+  }
+
+  // ── Epitaph placeholder ────────────────────────
+  var epitaphEl = document.getElementById('deathEpitaph');
+  if (epitaphEl) epitaphEl.textContent = '...';
+
   document.getElementById('deathScreen').style.display  = 'flex';
+
+  // ── Fetch Claude epitaph ───────────────────────
+  fetchDeathEpitaph(
+    character.name, cause, daysFinal, location, inv, traits, currentScore,
+    function(text) {
+      var el = document.getElementById('deathEpitaph');
+      if (el) {
+        // Re-trigger fade animation so late arrivals still animate
+        el.style.animation = 'none';
+        el.textContent = text;
+        void el.offsetWidth; // reflow
+        el.style.animation = 'fadeIn 1.5s ease-in both';
+      }
+    }
+  );
+}
+
+function fetchDeathEpitaph(name, cause, days, location, inventory, traits, score, callback) {
+  var fallback = 'The city claimed another.';
+
+  var done = false;
+  function finish(text) {
+    if (done) return;
+    done = true;
+    callback(text);
+  }
+
+  try {
+    var body = JSON.stringify({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 60,
+      system:     'You write terse, darkly funny epitaphs for a post-apocalyptic survival game. One epitaph only. 2 sentences max. No quotes around it.',
+      messages:   [{
+        role:    'user',
+        content: 'Write an epitaph for ' + name + ', who survived ' + days +
+          ' days after the blackout. They died of ' + cause + ' at ' + location + '. ' +
+          'They carried: ' + inventory + '. ' +
+          'Their traits were: ' + traits + '. ' +
+          'Score: ' + score + '/500.'
+      }]
+    });
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/.netlify/functions/claude', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.timeout = 8000;
+
+    xhr.onload = function() {
+      try {
+        var data = JSON.parse(xhr.responseText);
+        if (data.content && data.content[0] && data.content[0].text) {
+          finish(data.content[0].text.trim());
+        } else {
+          finish(fallback);
+        }
+      } catch(e) { finish(fallback); }
+    };
+    xhr.onerror   = function() { finish(fallback); };
+    xhr.ontimeout = function() { finish(fallback); };
+    xhr.send(body);
+  } catch(e) {
+    finish(fallback);
+  }
 }
 
 function showVictory() {
