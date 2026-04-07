@@ -2729,6 +2729,7 @@ function setSceneByLocation(locationStr) {
 var chatLog = [];
 var dreamSequenceActive = false;
 var dreamSequenceUsed = { morale: false, artifact: false, day7: false };
+var dreamAudioRef = null;
 var gameState = {
   morale:    75,
   hunger:    80,
@@ -4960,6 +4961,7 @@ function endDreamTransition(callback) {
     overlay.classList.remove('flash-out');
     overlay.style.display = 'none';
     document.getElementById('dreamHUD').style.display = 'none';
+    document.getElementById('dreamControls').style.display = 'none';
     if (callback) callback();
   }, 600);
 }
@@ -5490,7 +5492,9 @@ function runDreamGame(onComplete) {
     crt.classList.remove('dreaming');
 
     if (dreamAudioRef) {
-      if (dreamAudioRef.playExit) dreamAudioRef.playExit();
+      // Only play generic exit whoosh for non-good outcomes;
+      // good outcome already played playExitFound() before finish() was called
+      if (outcome.tier !== 'good' && dreamAudioRef.playExit) dreamAudioRef.playExit();
       setTimeout(function() {
         if (dreamAudioRef && dreamAudioRef.stopAll) dreamAudioRef.stopAll();
         dreamAudioRef = null;
