@@ -532,6 +532,18 @@
     .t-wait     { color: var(--green-dim); font-style: italic; }
     .t-system   { color: #999; font-size: 0.82em; letter-spacing: 1px; }
     .t-hint     { color: #7aba7a; font-size: 0.76em; font-style: italic; }
+
+    /* Per-word typewriter fade */
+    .tw-word {
+      display: inline;
+      opacity: 0;
+      animation: twWordIn 100ms ease forwards;
+    }
+
+    @keyframes twWordIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
     .t-tutorial {
       color: #7aba7a;
       font-size: 0.76em;
@@ -3960,6 +3972,98 @@ function removeCursor() {
 }
 
 // ════════════════════════════════════════════
+//  TYPEWRITER TEXT REVEAL
+// ════════════════════════════════════════════
+
+var activeTypewriter = null; // handle to cancel a running animation
+
+// Reveals `text` word-by-word in a new span.cls appended to #story.
+// Calls callback() once animation completes (or is cancelled).
+// Input and quick buttons are disabled for the duration.
+function typewriteLine(text, cls, callback) {
+  // Cancel any previous animation and show its remaining text instantly
+  if (activeTypewriter) {
+    activeTypewriter.cancel();
+    activeTypewriter = null;
+  }
+
+  var story  = document.getElementById('story');
+  var input  = document.getElementById('cmdInput');
+  var goBtn  = document.getElementById('goBtn');
+
+  var outer = document.createElement('span');
+  if (cls) outer.className = cls;
+  story.appendChild(outer);
+
+  var words    = text.split(' ');
+  var idx      = 0;
+  var iv       = null;
+  var finished = false;
+
+  function finish() {
+    if (finished) return;
+    finished = true;
+    if (iv) { clearInterval(iv); iv = null; }
+
+    // Cursor + line break inside the same span (mirrors original addLine behaviour)
+    var br = document.createElement('br');
+    outer.appendChild(br);
+    var cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    outer.appendChild(cursor);
+
+    story.scrollTo({ top: story.scrollHeight, behavior: 'smooth' });
+    activeTypewriter = null;
+
+    // Re-enable UI
+    input.disabled = false;
+    goBtn.disabled = false;
+    setQuickActionsDisabled(false);
+    softFocus(input);
+
+    if (callback) callback();
+  }
+
+  function addNextWord() {
+    if (idx >= words.length) {
+      finish();
+      return;
+    }
+    var w = document.createElement('span');
+    w.className = 'tw-word';
+    // Prepend a space for every word after the first
+    w.textContent = (idx > 0 ? ' ' : '') + words[idx];
+    outer.appendChild(w);
+    idx++;
+    story.scrollTo({ top: story.scrollHeight, behavior: 'smooth' });
+  }
+
+  function cancel() {
+    if (finished) return;
+    if (iv) { clearInterval(iv); iv = null; }
+    // Dump all remaining words instantly (no animation)
+    while (idx < words.length) {
+      var w = document.createElement('span');
+      w.className = 'tw-word';
+      w.style.opacity  = '1';
+      w.style.animation = 'none';
+      w.textContent = (idx > 0 ? ' ' : '') + words[idx];
+      outer.appendChild(w);
+      idx++;
+    }
+    finish();
+  }
+
+  // Disable input for the duration of the animation
+  input.disabled = true;
+  goBtn.disabled = true;
+  setQuickActionsDisabled(true);
+
+  iv = setInterval(addNextWord, 30);
+  activeTypewriter = { cancel: cancel };
+}
+
+// ════════════════════════════════════════════
 //  QUICK COMMAND BUTTONS
 // ════════════════════════════════════════════
 function quickCmd(cmd) {
@@ -4469,6 +4573,12 @@ function sendCommand() {
   var val = input.value.trim();
   if (!val || goBtn.disabled) return;
 
+  // Cancel any typewriter still running before starting a new turn
+  if (activeTypewriter) {
+    activeTypewriter.cancel();
+    activeTypewriter = null;
+  }
+
   soundEnter();
   input.value = '';
   input.disabled = true;
@@ -4575,7 +4685,9 @@ function sendCommand() {
         handleClaudePoints(parsed);
         checkTutorial(parsed);
         if (!checkGameOver(parsed)) {
-          addLine(parsed.narration + '<br><span class="cursor"></span>', 't-narrator');
+          // Word-by-word reveal; done() is called by the typewriter callback
+          typewriteLine(parsed.narration, 't-narrator', done);
+          return; // skip the done() call below — typewriter owns it
         }
       }
     } catch(e) {
