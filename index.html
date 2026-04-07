@@ -4970,13 +4970,278 @@ function launchDreamSequence(triggerType) {
 }
 
 // ════════════════════════════════════════════
-//  DREAM SEQUENCE — REALITY STABILIZATION GAME
+//  DREAM SEQUENCE — RAYCASTING FPS ENGINE
 // ════════════════════════════════════════════
+
+function generateDreamMap() {
+  var W = 10, H = 10;
+  // Start all walls (type 1)
+  var map = [];
+  for (var r = 0; r < H; r++) {
+    map[r] = [];
+    for (var c = 0; c < W; c++) map[r][c] = 1;
+  }
+
+  // Recursive backtracking maze carver (works on odd cells: 1,1  1,3  3,1 …)
+  var visited = [];
+  for (var r = 0; r < H; r++) { visited[r] = []; for (var c = 0; c < W; c++) visited[r][c] = false; }
+
+  function carve(cx, cy) {
+    visited[cy][cx] = true;
+    map[cy][cx] = 0;
+    var dirs = [[0,-2],[0,2],[-2,0],[2,0]];
+    // shuffle dirs
+    for (var i = dirs.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = dirs[i]; dirs[i] = dirs[j]; dirs[j] = tmp;
+    }
+    for (var d = 0; d < dirs.length; d++) {
+      var nx = cx + dirs[d][0], ny = cy + dirs[d][1];
+      if (nx >= 1 && nx < W-1 && ny >= 1 && ny < H-1 && !visited[ny][nx]) {
+        // carve the wall between
+        map[cy + dirs[d][1]/2][cx + dirs[d][0]/2] = 0;
+        carve(nx, ny);
+      }
+    }
+  }
+  carve(1, 1);
+
+  // Replace ~20% of walls that touch a corridor with type 2 (rust)
+  for (var r = 1; r < H-1; r++) {
+    for (var c = 1; c < W-1; c++) {
+      if (map[r][c] === 1 && Math.random() < 0.2) {
+        var adj = [[0,1],[0,-1],[1,0],[-1,0]];
+        for (var a = 0; a < adj.length; a++) {
+          if (map[r+adj[a][0]][c+adj[a][1]] === 0) { map[r][c] = 2; break; }
+        }
+      }
+    }
+  }
+
+  // Find cell farthest from spawn (1,1) using BFS
+  var dist = [];
+  for (var r = 0; r < H; r++) { dist[r] = []; for (var c = 0; c < W; c++) dist[r][c] = -1; }
+  var queue = [{x:1, y:1, d:0}];
+  dist[1][1] = 0;
+  var farthest = {x:1, y:1, d:0};
+  while (queue.length) {
+    var cur = queue.shift();
+    if (cur.d > farthest.d) farthest = cur;
+    var nb = [[0,1],[0,-1],[1,0],[-1,0]];
+    for (var n = 0; n < nb.length; n++) {
+      var nx2 = cur.x + nb[n][1], ny2 = cur.y + nb[n][0];
+      if (nx2 >= 0 && nx2 < W && ny2 >= 0 && ny2 < H && map[ny2][nx2] === 0 && dist[ny2][nx2] === -1) {
+        dist[ny2][nx2] = cur.d + 1;
+        queue.push({x:nx2, y:ny2, d:cur.d+1});
+      }
+    }
+  }
+  map[farthest.y][farthest.x] = 3; // exit door
+
+  return map;
+}
+
+function castRays(player, map) {
+  var W = 320, FOV = Math.PI / 3; // 60°
+  var rays = [];
+  for (var col = 0; col < W; col++) {
+    var rayAngle = (player.angle - FOV / 2) + (col / W) * FOV;
+    var rayDirX = Math.cos(rayAngle);
+    var rayDirY = Math.sin(rayAngle);
+
+    var mapX = Math.floor(player.x);
+    var mapY = Math.floor(player.y);
+
+    // Length of ray to cross one cell in each axis
+    var deltaDistX = Math.abs(rayDirX) < 1e-10 ? 1e10 : Math.abs(1 / rayDirX);
+    var deltaDistY = Math.abs(rayDirY) < 1e-10 ? 1e10 : Math.abs(1 / rayDirY);
+
+    var stepX, stepY, sideDistX, sideDistY;
+    if (rayDirX < 0) {
+      stepX = -1; sideDistX = (player.x - mapX) * deltaDistX;
+    } else {
+      stepX = 1;  sideDistX = (mapX + 1.0 - player.x) * deltaDistX;
+    }
+    if (rayDirY < 0) {
+      stepY = -1; sideDistY = (player.y - mapY) * deltaDistY;
+    } else {
+      stepY = 1;  sideDistY = (mapY + 1.0 - player.y) * deltaDistY;
+    }
+
+    var side = 0, hit = false, wallType = 1;
+    var MAX_STEPS = 30;
+    for (var step = 0; step < MAX_STEPS && !hit; step++) {
+      if (sideDistX < sideDistY) { sideDistX += deltaDistX; mapX += stepX; side = 0; }
+      else                        { sideDistY += deltaDistY; mapY += stepY; side = 1; }
+      if (mapY >= 0 && mapY < map.length && mapX >= 0 && mapX < map[0].length && map[mapY][mapX] !== 0) {
+        hit = true; wallType = map[mapY][mapX];
+      }
+    }
+
+    var perpDist;
+    if (!hit) {
+      perpDist = MAX_STEPS;
+    } else if (side === 0) {
+      perpDist = sideDistX - deltaDistX;
+    } else {
+      perpDist = sideDistY - deltaDistY;
+    }
+
+    // Fisheye correction
+    perpDist = perpDist * Math.cos(rayAngle - player.angle);
+    if (perpDist < 0.01) perpDist = 0.01;
+
+    // textureX — position along wall face (0..1)
+    var wallX;
+    if (side === 0) wallX = player.y + perpDist * rayDirY;
+    else            wallX = player.x + perpDist * rayDirX;
+    wallX -= Math.floor(wallX);
+
+    rays.push({ distance: perpDist, wallType: wallType, side: side, textureX: wallX });
+  }
+  return rays;
+}
+
+function renderFrame(ctx, rays, player) {
+  var CW = 320, CH = 200;
+
+  // Sky
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, 0, CW, CH / 2);
+  // Floor
+  ctx.fillStyle = '#0d0d0d';
+  ctx.fillRect(0, CH / 2, CW, CH / 2);
+
+  var wallColors = { 1: [74, 74, 74], 2: [107, 58, 42], 3: [42, 107, 42] };
+
+  for (var col = 0; col < CW; col++) {
+    var ray = rays[col];
+    var lineH = Math.min(CH, Math.floor(CH / ray.distance));
+    var drawStart = Math.floor((CH - lineH) / 2);
+
+    var base = wallColors[ray.wallType] || wallColors[1];
+    var r = base[0], g = base[1], b = base[2];
+    // N/S side: darken 30%
+    if (ray.side === 1) { r = Math.floor(r * 0.7); g = Math.floor(g * 0.7); b = Math.floor(b * 0.7); }
+
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    ctx.fillRect(col, drawStart, 1, lineH);
+  }
+}
+
 function runDreamGame(onComplete) {
-  // PLACEHOLDER — retro FPS build incoming
-  setTimeout(function() {
-    onComplete({ score: 50, tier: 'neutral', hits: 0, misses: 0, penalties: 0, statBonus: { morale: 3, energy: 0 } });
-  }, 2000);
+  var canvas = document.getElementById('dreamCanvas');
+  var ctx = canvas.getContext('2d');
+  canvas.width = 320; canvas.height = 200;
+
+  var map = generateDreamMap();
+  var player = { x: 1.5, y: 1.5, angle: 0, moveSpeed: 0.06, rotSpeed: 0.04 };
+
+  var DURATION = 30000;
+  var startTime = Date.now();
+  var timerFill = document.getElementById('dreamTimerFill');
+  var scoreEl = document.getElementById('dreamScore');
+  var msgEl = document.getElementById('dreamMessage');
+  var hud = document.getElementById('dreamHUD');
+  var crt = document.querySelector('.crt');
+
+  hud.style.display = 'flex';
+  timerFill.style.width = '100%';
+  scoreEl.textContent = 'FIND THE EXIT';
+  crt.classList.add('dreaming');
+
+  var keys = {};
+  function onKeyDown(e) { keys[e.code] = true; }
+  function onKeyUp(e)   { keys[e.code] = false; }
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup',   onKeyUp);
+
+  var rafId = null;
+  var finished = false;
+
+  function finish(outcome) {
+    if (finished) return;
+    finished = true;
+    if (rafId) cancelAnimationFrame(rafId);
+    document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('keyup',   onKeyUp);
+    hud.style.display = 'none';
+    crt.classList.remove('dreaming');
+
+    if (dreamAudioRef) {
+      if (dreamAudioRef.playExit) dreamAudioRef.playExit();
+      setTimeout(function() {
+        if (dreamAudioRef && dreamAudioRef.stopAll) dreamAudioRef.stopAll();
+        dreamAudioRef = null;
+      }, 1200);
+    }
+
+    var msg = outcome.tier === 'good' ? 'EXIT FOUND' : 'SIGNAL LOST';
+    msgEl.textContent = msg;
+    msgEl.classList.add('active');
+    setTimeout(function() {
+      msgEl.classList.remove('active');
+      onComplete(outcome);
+    }, 2000);
+  }
+
+  if (dreamAudioRef && dreamAudioRef.startDrone) dreamAudioRef.startDrone();
+
+  function loop() {
+    if (finished) return;
+
+    // Timer
+    var elapsed = Date.now() - startTime;
+    var pct = Math.max(0, 100 - (elapsed / DURATION) * 100);
+    timerFill.style.width = pct + '%';
+
+    if (elapsed >= DURATION) {
+      finish({ score: 40, tier: 'neutral', hits: 0, misses: 0, penalties: 0, statBonus: { morale: 3, energy: 0 } });
+      return;
+    }
+
+    // Input
+    var moveX = 0, moveY = 0, rot = 0;
+    var cos = Math.cos(player.angle), sin = Math.sin(player.angle);
+
+    if (keys['KeyW']    || keys['ArrowUp'])    { moveX += cos * player.moveSpeed; moveY += sin * player.moveSpeed; }
+    if (keys['KeyS']    || keys['ArrowDown'])  { moveX -= cos * player.moveSpeed; moveY -= sin * player.moveSpeed; }
+    if (keys['KeyA']    || keys['ArrowLeft'])  rot -= player.rotSpeed;
+    if (keys['KeyD']    || keys['ArrowRight']) rot += player.rotSpeed;
+
+    player.angle += rot;
+
+    // Wall collision (check each axis independently, allow sliding)
+    var nx = player.x + moveX;
+    var ny = player.y + moveY;
+    var MARGIN = 0.25;
+    if (map[Math.floor(player.y)][Math.floor(nx)] === 0 || map[Math.floor(player.y)][Math.floor(nx)] === 3) {
+      player.x = nx;
+    } else if (moveX !== 0) {
+      // push to wall edge
+      player.x = moveX > 0 ? Math.floor(nx) - MARGIN : Math.ceil(nx) + MARGIN;
+    }
+    if (map[Math.floor(ny)][Math.floor(player.x)] === 0 || map[Math.floor(ny)][Math.floor(player.x)] === 3) {
+      player.y = ny;
+    } else if (moveY !== 0) {
+      player.y = moveY > 0 ? Math.floor(ny) - MARGIN : Math.ceil(ny) + MARGIN;
+    }
+
+    // Check exit
+    var cellX = Math.floor(player.x), cellY = Math.floor(player.y);
+    if (map[cellY] && map[cellY][cellX] === 3) {
+      finish({ score: 90, tier: 'good', hits: 0, misses: 0, penalties: 0, statBonus: { morale: 8, energy: 5 } });
+      return;
+    }
+
+    // Render
+    var rays = castRays(player, map);
+    renderFrame(ctx, rays, player);
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  rafId = requestAnimationFrame(loop);
 }
 
 // ════════════════════════════════════════════
