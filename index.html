@@ -1537,25 +1537,7 @@
       animation: dreamBreathe 4s ease-in-out infinite;
     }
 
-    #dreamHUD {
-      position: absolute; top: 12px; left: 16px; right: 16px;
-      display: flex; justify-content: space-between; align-items: center;
-      pointer-events: none; z-index: 5;
-    }
-    #dreamTimerBar {
-      width: 200px; height: 6px;
-      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 3px; overflow: hidden;
-    }
-    #dreamTimerFill {
-      height: 100%; width: 100%;
-      background: linear-gradient(to right, #00ff41, #ff2244);
-      transition: width 0.3s linear; border-radius: 3px;
-    }
-    #dreamScore {
-      font-family: 'VT323', monospace; font-size: 1em;
-      color: #00ff41; letter-spacing: 2px; text-shadow: 0 0 6px #00ff41;
-    }
+    #dreamHUD { display: none !important; }
 
     #dreamMessage {
       position: absolute; top: 50%; left: 50%;
@@ -5148,36 +5130,37 @@ function castRays(player, map) {
   return rays;
 }
 
-function renderFrame(ctx, rays, player, enemies, weapon, introAlpha) {
-  var CW = 320, CH = 200;
+function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
+  var CW = 320, CH = 200, VH = 160; // VH = 3D viewport height; bottom 40px = HUD
   var FOV = Math.PI / 3;
   var depthBuffer = rays.depthBuffer;
 
-  // Subtle green phosphor tint (applied first, beneath everything)
+  // ── 3D Viewport (y: 0–160) ──
+
+  // Subtle green phosphor tint
   ctx.fillStyle = 'rgba(0,20,0,0.05)';
-  ctx.fillRect(0, 0, CW, CH);
+  ctx.fillRect(0, 0, CW, VH);
 
   // Sky
   ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, 0, CW, CH / 2);
+  ctx.fillRect(0, 0, CW, VH / 2);
   // Floor
   ctx.fillStyle = '#0d0d0d';
-  ctx.fillRect(0, CH / 2, CW, CH / 2);
+  ctx.fillRect(0, VH / 2, CW, VH / 2);
 
   var wallColors = { 1: [74, 74, 74], 2: [107, 58, 42], 3: [42, 107, 42] };
 
   for (var col = 0; col < CW; col++) {
     var ray = rays[col];
-    var lineH = Math.min(CH, Math.floor(CH / ray.distance));
-    var drawStart = Math.floor((CH - lineH) / 2);
+    var lineH = Math.min(VH, Math.floor(VH / ray.distance));
+    var drawStart = Math.floor((VH - lineH) / 2);
 
     var base = wallColors[ray.wallType] || wallColors[1];
     var r = base[0], g = base[1], b = base[2];
-    // N/S side: darken 30%
     if (ray.side === 1) { r = Math.floor(r * 0.7); g = Math.floor(g * 0.7); b = Math.floor(b * 0.7); }
 
-    // Vertical stripe texture: ±10 brightness every 2px
-    for (var wy = drawStart; wy < drawStart + lineH; wy++) {
+    for (var wy = drawStart; wy < drawStart + lineH && wy < VH; wy++) {
+      if (wy < 0) continue;
       var stripe = (wy % 2 === 0) ? 10 : -10;
       var tr = Math.min(255, Math.max(0, r + stripe));
       var tg = Math.min(255, Math.max(0, g + stripe));
@@ -5187,115 +5170,208 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha) {
     }
   }
 
-  // ── Sprite rendering ──
-  if (!enemies || !enemies.length) return;
+  // ── Sprite rendering (clamped to viewport) ──
+  if (enemies && enemies.length) {
+    var sorted = enemies.filter(function(e) { return e.alive; }).map(function(e) {
+      var dx = e.x - player.x, dy = e.y - player.y;
+      return { e: e, dist2: dx*dx + dy*dy };
+    });
+    sorted.sort(function(a, b) { return b.dist2 - a.dist2; });
 
-  // Sort enemies farthest-first so closer ones overdraw
-  var sorted = enemies.filter(function(e) { return e.alive; }).map(function(e) {
-    var dx = e.x - player.x, dy = e.y - player.y;
-    return { e: e, dist2: dx*dx + dy*dy };
-  });
-  sorted.sort(function(a, b) { return b.dist2 - a.dist2; });
+    for (var si = 0; si < sorted.length; si++) {
+      var e = sorted[si].e;
+      var dx = e.x - player.x;
+      var dy = e.y - player.y;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 0.1) continue;
 
-  for (var si = 0; si < sorted.length; si++) {
-    var e = sorted[si].e;
-    var dx = e.x - player.x;
-    var dy = e.y - player.y;
-    var dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist < 0.1) continue;
+      var spriteAngle = Math.atan2(dy, dx) - player.angle;
+      while (spriteAngle >  Math.PI) spriteAngle -= 2 * Math.PI;
+      while (spriteAngle < -Math.PI) spriteAngle += 2 * Math.PI;
+      if (Math.abs(spriteAngle) > FOV / 2 + 0.1) continue;
 
-    // Angle of sprite relative to player direction
-    var spriteAngle = Math.atan2(dy, dx) - player.angle;
-    // Normalise to [-π, π]
-    while (spriteAngle >  Math.PI) spriteAngle -= 2 * Math.PI;
-    while (spriteAngle < -Math.PI) spriteAngle += 2 * Math.PI;
+      var spriteH = Math.min(VH, Math.floor(VH / dist));
+      var spriteW = spriteH;
+      var spriteTop = Math.floor((VH - spriteH) / 2);
+      var screenCX = Math.floor(((spriteAngle + FOV / 2) / FOV) * CW);
+      var colStart = screenCX - Math.floor(spriteW / 2);
+      var colEnd   = screenCX + Math.floor(spriteW / 2);
 
-    // Outside FOV (add a little buffer)
-    if (Math.abs(spriteAngle) > FOV / 2 + 0.1) continue;
+      for (var sc = colStart; sc < colEnd; sc++) {
+        if (sc < 0 || sc >= CW) continue;
+        if (depthBuffer[sc] < dist) continue;
+        var tx = (sc - colStart) / spriteW;
 
-    // Project
-    var spriteH = Math.min(CH, Math.floor(CH / dist));
-    var spriteW = spriteH; // square sprite
-    var spriteTop = Math.floor((CH - spriteH) / 2);
+        var bodyTop    = Math.max(0, spriteTop + Math.floor(spriteH * 0.35));
+        var bodyBottom = Math.min(VH, spriteTop + spriteH);
+        var headTop    = Math.max(0, spriteTop);
+        var headBottom = Math.min(VH, spriteTop + Math.floor(spriteH * 0.35));
 
-    // Screen X center: map spriteAngle to column
-    var screenCX = Math.floor(((spriteAngle + FOV / 2) / FOV) * CW);
+        if (bodyBottom > bodyTop) { ctx.fillStyle = '#2d4a1a'; ctx.fillRect(sc, bodyTop, 1, bodyBottom - bodyTop); }
+        if (headBottom > headTop) { ctx.fillStyle = '#3d5a2a'; ctx.fillRect(sc, headTop, 1, headBottom - headTop); }
 
-    var colStart = screenCX - Math.floor(spriteW / 2);
-    var colEnd   = screenCX + Math.floor(spriteW / 2);
-
-    for (var sc = colStart; sc < colEnd; sc++) {
-      if (sc < 0 || sc >= CW) continue;
-      if (depthBuffer[sc] < dist) continue; // occluded by wall
-
-      // Normalised position within the sprite (0..1)
-      var tx = (sc - colStart) / spriteW;
-
-      // Body: lower 60% of sprite height
-      var bodyTop    = spriteTop + Math.floor(spriteH * 0.35);
-      var bodyBottom = spriteTop + spriteH;
-      // Head: upper 35%
-      var headTop    = spriteTop;
-      var headBottom = spriteTop + Math.floor(spriteH * 0.35);
-
-      ctx.fillStyle = '#2d4a1a';
-      ctx.fillRect(sc, bodyTop, 1, bodyBottom - bodyTop);
-
-      ctx.fillStyle = '#3d5a2a';
-      ctx.fillRect(sc, headTop, 1, headBottom - headTop);
-
-      // Eyes: two columns ~30% and ~70% across head, vertically centred in head
-      var eyeY = headTop + Math.floor((headBottom - headTop) * 0.4);
-      if (tx > 0.25 && tx < 0.38) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
-      if (tx > 0.62 && tx < 0.75) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
+        var eyeY = headTop + Math.floor((headBottom - headTop) * 0.4);
+        if (eyeY >= 0 && eyeY < VH) {
+          if (tx > 0.25 && tx < 0.38) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
+          if (tx > 0.62 && tx < 0.75) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
+        }
+      }
     }
   }
 
-  // ── Weapon HUD ──
-  if (!weapon) return;
-  var cx = 160;
-  // Muzzle flash (3-frame burst) — drawn behind barrel so it peeks out
-  if (weapon.firing) {
-    ctx.fillStyle = '#ffdd00';
-    ctx.fillRect(cx - 14, 100, 12, 20);
-    ctx.fillRect(cx +  2, 100, 12, 20);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(cx -  6,  95, 12, 12);
+  // ── Weapon (positioned for 160px viewport) ──
+  if (weapon) {
+    var cx = 160;
+    if (weapon.firing) {
+      ctx.fillStyle = '#ffdd00';
+      ctx.fillRect(cx - 14, 68, 12, 20);
+      ctx.fillRect(cx +  2, 68, 12, 20);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(cx -  6, 63, 12, 12);
+    }
+    ctx.fillStyle = '#444444';
+    ctx.fillRect(cx - 8, 85, 16, 52);
+    ctx.fillStyle = '#6b4a2a';
+    ctx.fillRect(cx - 20, 130, 40, 30);
   }
-  // Barrel: dark gray, 16px wide, 65px tall
-  ctx.fillStyle = '#444444';
-  ctx.fillRect(cx - 8, 115, 16, 65);
-  // Stock: brown, 40px wide, 30px tall
-  ctx.fillStyle = '#6b4a2a';
-  ctx.fillRect(cx - 20, 165, 40, 35);
-  // Compact HUD: KILLS | HP | AMMO — color HP red when low
-  ctx.font = '10px monospace';
-  ctx.fillStyle = '#00ff41';
-  ctx.fillText('AMMO: ' + weapon.ammo, 242, 195);
 
-  // ── CRT post-processing (drawn last, on top of everything) ──
+  // ── Duke-Style HUD Bar (y: 160–200) ──
+  if (hudData) {
+    var hp = hudData.hp;
+    var kills = hudData.kills;
+    var totalE = hudData.totalEnemies;
+    var hElapsed = hudData.elapsed;
+    var hDuration = hudData.duration;
+    var fc = hudData.frameCount;
 
-  // Scanlines: semi-transparent black bar every other row
+    // HUD background
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(0, VH, CW, 40);
+    // Top edge highlight
+    ctx.fillStyle = '#0055ff';
+    ctx.fillRect(0, VH, CW, 1);
+
+    // ── LEFT: Health (x: 4–90) ──
+    ctx.textAlign = 'left';
+    ctx.font = '7px monospace';
+    ctx.fillStyle = '#ffaa00';
+    ctx.fillText('HEALTH', 6, VH + 11);
+    ctx.font = '12px monospace';
+    ctx.fillText('' + hp, 6, VH + 24);
+    // Health bar background
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(6, VH + 28, 80, 5);
+    // Health bar fill
+    var hpPct = Math.max(0, hp / 100);
+    ctx.fillStyle = hp > 50 ? '#00ff00' : hp > 25 ? '#ffff00' : '#ff0000';
+    ctx.fillRect(6, VH + 28, Math.floor(80 * hpPct), 5);
+
+    // ── CENTER: Face + Kills (x: 110–210) ──
+    var faceX = 151, faceY = VH + 3;
+    // Hair
+    ctx.fillStyle = '#4a3520';
+    ctx.fillRect(faceX, faceY, 18, 3);
+    // Skin
+    ctx.fillStyle = '#d4a574';
+    ctx.fillRect(faceX, faceY + 3, 18, 17);
+    // Sunglasses
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(faceX + 2, faceY + 7, 5, 3);
+    ctx.fillRect(faceX + 11, faceY + 7, 5, 3);
+    ctx.fillRect(faceX + 7, faceY + 8, 4, 1);
+
+    if (hp >= 75) {
+      // Healthy: grin
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(faceX + 5, faceY + 14, 8, 1);
+      ctx.fillRect(faceX + 4, faceY + 13, 1, 1);
+      ctx.fillRect(faceX + 13, faceY + 13, 1, 1);
+    } else if (hp >= 50) {
+      // Scuffed: cracked left lens, neutral mouth
+      ctx.fillStyle = '#666666';
+      ctx.fillRect(faceX + 3, faceY + 7, 1, 1);
+      ctx.fillRect(faceX + 4, faceY + 8, 1, 1);
+      ctx.fillRect(faceX + 5, faceY + 9, 1, 1);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(faceX + 5, faceY + 14, 8, 1);
+    } else if (hp >= 25) {
+      // Hurt: cracked lens, blood, grimace
+      ctx.fillStyle = '#666666';
+      ctx.fillRect(faceX + 3, faceY + 7, 1, 1);
+      ctx.fillRect(faceX + 4, faceY + 8, 1, 1);
+      ctx.fillRect(faceX + 5, faceY + 9, 1, 1);
+      ctx.fillStyle = '#cc0000';
+      ctx.fillRect(faceX + 1, faceY + 11, 2, 2);
+      ctx.fillRect(faceX + 15, faceY + 5, 2, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(faceX + 6, faceY + 14, 6, 1);
+    } else {
+      // Critical: both lenses cracked, heavy blood, open grimace
+      ctx.fillStyle = '#666666';
+      ctx.fillRect(faceX + 3, faceY + 7, 1, 1);
+      ctx.fillRect(faceX + 4, faceY + 8, 1, 1);
+      ctx.fillRect(faceX + 5, faceY + 9, 1, 1);
+      ctx.fillRect(faceX + 14, faceY + 7, 1, 1);
+      ctx.fillRect(faceX + 13, faceY + 8, 1, 1);
+      ctx.fillRect(faceX + 12, faceY + 9, 1, 1);
+      ctx.fillStyle = '#cc0000';
+      ctx.fillRect(faceX + 1, faceY + 11, 2, 3);
+      ctx.fillRect(faceX + 15, faceY + 5, 2, 3);
+      ctx.fillRect(faceX + 8, faceY + 12, 2, 2);
+      ctx.fillStyle = '#880000';
+      ctx.fillRect(faceX + 6, faceY + 14, 6, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(faceX + 7, faceY + 14, 1, 1);
+      ctx.fillRect(faceX + 10, faceY + 14, 1, 1);
+    }
+
+    // Kills text below face
+    ctx.font = '7px monospace';
+    ctx.fillStyle = '#ffaa00';
+    ctx.textAlign = 'center';
+    ctx.fillText('KILLS: ' + kills + ' / ' + totalE, 160, VH + 36);
+
+    // ── RIGHT: Ammo + Timer (x: 220–316) ──
+    ctx.textAlign = 'right';
+    ctx.font = '7px monospace';
+    ctx.fillStyle = '#ffaa00';
+    ctx.fillText('SHELLS', 314, VH + 11);
+    ctx.font = '12px monospace';
+    ctx.fillText('' + (weapon ? weapon.ammo : 0), 314, VH + 24);
+    var secsLeft = Math.max(0, Math.ceil((hDuration - hElapsed) / 1000));
+    var mins = Math.floor(secsLeft / 60);
+    var secs = secsLeft % 60;
+    var timeStr = 'TIME: ' + (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+    ctx.font = '7px monospace';
+    if (secsLeft < 10 && fc % 30 < 15) {
+      ctx.fillStyle = '#ff0000';
+    } else {
+      ctx.fillStyle = '#ffaa00';
+    }
+    ctx.fillText(timeStr, 314, VH + 36);
+    ctx.textAlign = 'left';
+  }
+
+  // ── CRT post-processing (full canvas) ──
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   for (var sy = 0; sy < CH; sy += 2) {
     ctx.fillRect(0, sy, CW, 1);
   }
 
-  // Vignette: radial gradient darkening edges
-  var vg = ctx.createRadialGradient(CW / 2, CH / 2, CH * 0.25, CW / 2, CH / 2, CH * 0.75);
+  // Vignette over viewport only
+  var vg = ctx.createRadialGradient(CW / 2, VH / 2, VH * 0.25, CW / 2, VH / 2, VH * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
   vg.addColorStop(1, 'rgba(0,0,0,0.6)');
   ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, CW, CH);
+  ctx.fillRect(0, 0, CW, VH);
 
-  // Random glitch: 0.5% chance per frame
+  // Random glitch (viewport only)
   if (Math.random() < 0.005) {
-    var glitchX = Math.floor(Math.random() * 8) - 4; // -4..+4 px
-    ctx.drawImage(ctx.canvas, glitchX, 0);
-    // 1-3 horizontal noise bands
+    var glitchX = Math.floor(Math.random() * 8) - 4;
+    ctx.drawImage(ctx.canvas, 0, 0, CW, VH, glitchX, 0, CW, VH);
     var bands = 1 + Math.floor(Math.random() * 3);
     for (var bi = 0; bi < bands; bi++) {
-      var by = Math.floor(Math.random() * CH);
+      var by = Math.floor(Math.random() * VH);
       var bh = 1 + Math.floor(Math.random() * 3);
       ctx.fillStyle = 'rgba(' + Math.floor(Math.random()*255) + ',' +
                                 Math.floor(Math.random()*255) + ',' +
@@ -5304,14 +5380,14 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha) {
     }
   }
 
-  // Intro flash: "ENTERING THE STATIC" fades out over 60 frames
+  // Intro flash
   if (introAlpha > 0) {
     ctx.save();
     ctx.globalAlpha = introAlpha;
     ctx.fillStyle = '#ff2222';
     ctx.font = 'bold 18px VT323, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('ENTERING THE STATIC', CW / 2, CH / 2);
+    ctx.fillText('ENTERING THE STATIC', CW / 2, VH / 2);
     ctx.restore();
   }
 }
@@ -5352,8 +5428,6 @@ function runDreamGame(onComplete) {
 
   var DURATION = 30000;
   var startTime = Date.now();
-  var timerFill = document.getElementById('dreamTimerFill');
-  var scoreEl   = document.getElementById('dreamScore');
   var msgEl     = document.getElementById('dreamMessage');
   var hitFlash  = document.getElementById('dreamHitFlash');
   var hud       = document.getElementById('dreamHUD');
@@ -5365,9 +5439,6 @@ function runDreamGame(onComplete) {
   var overlay   = document.getElementById('dreamOverlay');
   var isTouchDevice = ('ontouchstart' in window);
 
-  hud.style.display = 'flex';
-  timerFill.style.width = '100%';
-  scoreEl.textContent = 'KILLS: 0 / ' + numEnemies;
   crt.classList.add('dreaming');
 
   // ── Touch controls setup ──
@@ -5438,7 +5509,7 @@ function runDreamGame(onComplete) {
     weapon.ammo--;
     if (dreamAudioRef && dreamAudioRef.playShotgun) dreamAudioRef.playShotgun();
 
-    var FOV = Math.PI / 3, CW = 320, CH = 200;
+    var FOV = Math.PI / 3, CW = 320, VH = 160;
     for (var i = 0; i < enemies.length; i++) {
       var en = enemies[i];
       if (!en.alive) continue;
@@ -5452,7 +5523,7 @@ function runDreamGame(onComplete) {
       if (Math.abs(sa) > FOV / 2 + 0.1) continue;
 
       var screenCX = Math.floor(((sa + FOV / 2) / FOV) * CW);
-      var spriteH  = Math.min(CH, Math.floor(CH / eDist));
+      var spriteH  = Math.min(VH, Math.floor(VH / eDist));
       var half     = Math.floor(spriteH / 2);
       var colStart = screenCX - half, colEnd = screenCX + half;
 
@@ -5527,8 +5598,6 @@ function runDreamGame(onComplete) {
 
     // Timer
     var elapsed = Date.now() - startTime;
-    var pct = Math.max(0, 100 - (elapsed / DURATION) * 100);
-    timerFill.style.width = pct + '%';
 
     if (elapsed >= DURATION) {
       if (dukeVoiceRef) dukeVoiceRef.speakTimeout();
@@ -5630,16 +5699,15 @@ function runDreamGame(onComplete) {
       if (map[Math.floor(eny)][Math.floor(en.x)] === 0 || map[Math.floor(eny)][Math.floor(en.x)] === 3) en.y = eny;
     }
 
-    // Update HUD score — color HP red when low
-    scoreEl.textContent = 'KILLS: ' + killCount + ' | HP: ' + playerHP + ' | AMMO: ' + weapon.ammo;
-    scoreEl.style.color = playerHP < 30 ? '#ff2222' : '#00ff41';
-
     // Intro fade (first 60 frames)
     var introAlpha = frameCount < 60 ? Math.max(0, 1 - frameCount / 60) : 0;
 
     // Render
     lastRays = castRays(player, map);
-    renderFrame(ctx, lastRays, player, enemies, weapon, introAlpha);
+    renderFrame(ctx, lastRays, player, enemies, weapon, introAlpha, {
+      hp: playerHP, kills: killCount, totalEnemies: numEnemies,
+      elapsed: elapsed, duration: DURATION, frameCount: frameCount
+    });
 
     rafId = requestAnimationFrame(loop);
   }
