@@ -2730,6 +2730,7 @@ var chatLog = [];
 var dreamSequenceActive = false;
 var dreamSequenceUsed = { morale: false, artifact: false, day7: false };
 var dreamAudioRef = null;
+var dukeVoiceRef = null;
 var gameState = {
   morale:    75,
   hunger:    80,
@@ -4989,6 +4990,7 @@ function launchDreamSequence(triggerType) {
 
   var dreamAudio = initDreamAudio();
   dreamAudioRef = dreamAudio;
+  dukeVoiceRef = initDukeDreamVoice();
 
   fetchDreamIntro(triggerType, function(introText) {
     triggerDreamTransition(introText, function() {
@@ -5459,6 +5461,10 @@ function runDreamGame(onComplete) {
         en.alive = false;
         killCount++;
         if (dreamAudioRef && dreamAudioRef.playEnemyDeath) dreamAudioRef.playEnemyDeath();
+        if (dukeVoiceRef) {
+          if (killCount >= numEnemies) dukeVoiceRef.speakVictory();
+          else dukeVoiceRef.speakKill();
+        }
         break; // one kill per shot
       }
     }
@@ -5498,6 +5504,7 @@ function runDreamGame(onComplete) {
       setTimeout(function() {
         if (dreamAudioRef && dreamAudioRef.stopAll) dreamAudioRef.stopAll();
         dreamAudioRef = null;
+        if (dukeVoiceRef) { dukeVoiceRef.stop(); dukeVoiceRef = null; }
       }, 1200);
     }
 
@@ -5513,6 +5520,7 @@ function runDreamGame(onComplete) {
   }
 
   if (dreamAudioRef && dreamAudioRef.startDrone) dreamAudioRef.startDrone();
+  setTimeout(function() { if (dukeVoiceRef && !finished) dukeVoiceRef.speakEntry(); }, 1500);
 
   function loop() {
     if (finished) return;
@@ -5523,6 +5531,7 @@ function runDreamGame(onComplete) {
     timerFill.style.width = pct + '%';
 
     if (elapsed >= DURATION) {
+      if (dukeVoiceRef) dukeVoiceRef.speakTimeout();
       var tScore = Math.min(100, 20 + killCount * 3);
       var tTier  = killCount >= 3 ? 'neutral' : 'bad';
       finish({ score: tScore, tier: tTier, hits: killCount, misses: 0, penalties: 0,
@@ -5578,6 +5587,7 @@ function runDreamGame(onComplete) {
     var cellX = Math.floor(player.x), cellY = Math.floor(player.y);
     if (map[cellY] && map[cellY][cellX] === 3) {
       if (dreamAudioRef && dreamAudioRef.playExitFound) dreamAudioRef.playExitFound();
+      if (dukeVoiceRef) dukeVoiceRef.speakVictory();
       var eScore = Math.min(100, 60 + killCount * 5);
       var eTier  = eScore >= 70 ? 'good' : 'neutral';
       finish({ score: eScore, tier: eTier, hits: killCount, misses: 0, penalties: 0,
@@ -5597,11 +5607,14 @@ function runDreamGame(onComplete) {
         if (damageTimer % 60 === 0) {
           playerHP -= 15;
           if (dreamAudioRef && dreamAudioRef.playPlayerHurt) dreamAudioRef.playPlayerHurt();
+          if (dukeVoiceRef) dukeVoiceRef.speakDamage();
           hitFlash.classList.remove('flash-bad');
           void hitFlash.offsetWidth;
           hitFlash.classList.add('flash-bad');
           setTimeout(function() { hitFlash.classList.remove('flash-bad'); }, 200);
+          if (playerHP > 0 && playerHP < 25 && dukeVoiceRef) dukeVoiceRef.speakLowHealth();
           if (playerHP <= 0) {
+            if (dukeVoiceRef) dukeVoiceRef.speakDeath();
             finish({ score: Math.min(100, killCount * 5), tier: 'bad',
                      hits: killCount, misses: 0, penalties: 0, statBonus: { morale: -5, energy: -3 } });
             return;
@@ -5762,6 +5775,119 @@ function applyDreamOutcome(outcome) {
     }
     applyState();
   }
+}
+
+// ════════════════════════════════════════════
+//  DUKE DREAM VOICE — POST-APOCALYPTIC ONE-LINERS
+// ════════════════════════════════════════════
+function initDukeDreamVoice() {
+  if (typeof speechSynthesis === 'undefined') return null;
+
+  var ENTRY_QUOTES = [
+    "It's time to kick ass and chew canned rations... and I'm all outta rations.",
+    "Wakey wakey, uglies. Your worst nightmare just showed up.",
+    "I came here to kill mutants and look good doing it.",
+    "Let's rock.",
+    "Damn, I hate these apocalypse dreams. Oh wait, no I don't."
+  ];
+
+  var KILL_QUOTES = [
+    "Heh heh heh... should've stayed irradiated.",
+    "Rest in pieces, freak show.",
+    "That's gonna leave a stain.",
+    "Damn, you're even uglier dead.",
+    "Cleanup on aisle apocalypse.",
+    "Who's next?",
+    "Too easy.",
+    "Your face, your ass. Radiation couldn't tell the difference.",
+    "I've stepped in scarier things.",
+    "And stay down.",
+    "Another one bites the dust.",
+    "Hail to the king, baby."
+  ];
+
+  var DAMAGE_QUOTES = [
+    "Is that all you got?",
+    "Now you've pissed me off.",
+    "I've had worse hangovers.",
+    "Lucky shot, mutant.",
+    "Okay, that one hurt."
+  ];
+
+  var VICTORY_QUOTES = [
+    "Hail to the king, baby.",
+    "I'm the last man standing. Again."
+  ];
+
+  var TIMEOUT_QUOTE = "Damn. I was just getting warmed up.";
+  var DEATH_QUOTE = "Even in my dreams, I can't catch a break.";
+  var LOW_HEALTH_QUOTE = "I ain't dying in a damn dream.";
+
+  var lastQuotes = {};
+  var lastDamageVoiceTime = 0;
+  var lowHealthPlayed = false;
+  var dukeVoice = null;
+
+  function findDeepVoice() {
+    var voices = speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    var preferred = ['daniel', 'james', 'alex', 'male', 'english'];
+    for (var p = 0; p < preferred.length; p++) {
+      for (var v = 0; v < voices.length; v++) {
+        if (voices[v].name.toLowerCase().indexOf(preferred[p]) !== -1) return voices[v];
+      }
+    }
+    return voices[0];
+  }
+
+  function speak(line) {
+    if (typeof speechSynthesis === 'undefined') return;
+    if (speechSynthesis.speaking) return;
+    var utter = new SpeechSynthesisUtterance(line);
+    if (!dukeVoice) dukeVoice = findDeepVoice();
+    if (dukeVoice) utter.voice = dukeVoice;
+    utter.pitch = 0.3;
+    utter.rate = 0.9;
+    speechSynthesis.speak(utter);
+  }
+
+  function pickRandom(arr, key) {
+    if (arr.length === 1) return arr[0];
+    var pick;
+    do {
+      pick = arr[Math.floor(Math.random() * arr.length)];
+    } while (pick === lastQuotes[key] && arr.length > 1);
+    lastQuotes[key] = pick;
+    return pick;
+  }
+
+  // Pre-load voices (some browsers populate asynchronously)
+  speechSynthesis.getVoices();
+  if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = function() { dukeVoice = findDeepVoice(); };
+  }
+
+  return {
+    speakEntry: function() { speak(pickRandom(ENTRY_QUOTES, 'entry')); },
+    speakKill: function() { speak(pickRandom(KILL_QUOTES, 'kill')); },
+    speakDamage: function() {
+      var now = Date.now();
+      if (now - lastDamageVoiceTime < 5000) return;
+      lastDamageVoiceTime = now;
+      speak(pickRandom(DAMAGE_QUOTES, 'damage'));
+    },
+    speakLowHealth: function() {
+      if (lowHealthPlayed) return;
+      lowHealthPlayed = true;
+      speak(LOW_HEALTH_QUOTE);
+    },
+    speakVictory: function() { speak(pickRandom(VICTORY_QUOTES, 'victory')); },
+    speakTimeout: function() { speak(TIMEOUT_QUOTE); },
+    speakDeath: function() { speak(DEATH_QUOTE); },
+    stop: function() {
+      try { speechSynthesis.cancel(); } catch(e) {}
+    }
+  };
 }
 
 // ════════════════════════════════════════════
@@ -5995,6 +6121,7 @@ function initDreamAudio() {
     }
     nodes = [];
     if (dreamGain) { try { dreamGain.disconnect(); } catch(e) {} dreamGain = null; }
+    try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); } catch(e) {}
   }
 
   return {
