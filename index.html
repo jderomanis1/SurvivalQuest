@@ -4917,24 +4917,37 @@ document.addEventListener('click', function resumeAudio() {
 // ════════════════════════════════════════════
 function triggerDreamTransition(introText, callback) {
   var crt = document.querySelector('.crt');
+  var introEl = document.getElementById('dreamIntroText');
+  var introSub = document.getElementById('dreamIntroSub');
 
   // Phase 1 — Screen glitch + entry sound (0–800ms)
   crt.classList.add('glitching');
   if (dreamAudioRef && dreamAudioRef.startEntry) dreamAudioRef.startEntry();
 
   setTimeout(function() {
-    // Phase 2 — Show intro (800ms–3500ms)
+    // Phase 2 — Boot sequence (800–2300ms)
     document.getElementById('dreamOverlay').style.display = 'flex';
     document.getElementById('dreamIntro').style.display = 'flex';
-    document.getElementById('dreamIntroText').textContent = introText;
+    introSub.style.display = 'none';
+    introEl.style.color = '#ffaa00';
+    introEl.textContent = 'LOADING DREAM.EXE...';
+
+    setTimeout(function() { introEl.textContent = 'REALITY OVERRIDE ACTIVE'; }, 500);
+    setTimeout(function() { introEl.textContent = 'WEAPONS: ONLINE'; }, 1000);
 
     setTimeout(function() {
-      // Phase 3 — Launch dream game
+      // Phase 3 — Claude intro text (2300–5000ms)
+      introEl.style.color = '';
+      introEl.textContent = introText;
+      introSub.style.display = '';
+    }, 1500);
+
+    setTimeout(function() {
+      // Phase 4 — Launch dream game
       document.getElementById('dreamIntro').style.display = 'none';
-      document.getElementById('dreamHUD').style.display = 'flex';
       crt.classList.remove('glitching');
       if (callback) callback();
-    }, 2700);
+    }, 4200);
   }, 800);
 }
 
@@ -5362,7 +5375,8 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
   if (shaking) {
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, CW, VH); ctx.clip();
-    ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6);
+    var shAmt = (hudData && hudData.shakeAmount) || 4;
+    ctx.translate((Math.random() - 0.5) * shAmt * 2, (Math.random() - 0.5) * shAmt * 1.5);
   }
 
   // Subtle green phosphor tint
@@ -5491,6 +5505,15 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
     ctx.fillRect(cx - 8, 85, 16, 52);
     ctx.fillStyle = '#6b4a2a';
     ctx.fillRect(cx - 20, 130, 40, 30);
+    // Muzzle flash glow
+    if (weapon.firing && weapon.cooldown > 12) {
+      var flashAlpha = (weapon.cooldown - 12) / 3 * 0.8;
+      var mfg = ctx.createRadialGradient(cx, 75, 2, cx, 75, 22);
+      mfg.addColorStop(0, 'rgba(255,255,170,' + flashAlpha + ')');
+      mfg.addColorStop(1, 'rgba(255,255,170,0)');
+      ctx.fillStyle = mfg;
+      ctx.fillRect(cx - 25, 50, 50, 50);
+    }
   }
 
   if (shaking) ctx.restore();
@@ -5625,6 +5648,22 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, CW, VH);
 
+  // Low health red pulse
+  if (hudData && hudData.hp < 25) {
+    var pulseA = 0.15 * Math.abs(Math.sin((hudData.frameCount || 0) * 0.1));
+    var rVig = ctx.createRadialGradient(CW / 2, VH / 2, VH * 0.2, CW / 2, VH / 2, VH * 0.8);
+    rVig.addColorStop(0, 'rgba(255,0,0,0)');
+    rVig.addColorStop(1, 'rgba(255,0,0,' + pulseA + ')');
+    ctx.fillStyle = rVig;
+    ctx.fillRect(0, 0, CW, VH);
+  }
+
+  // Boss death white flash
+  if (hudData && hudData.whiteFlash) {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillRect(0, 0, CW, CH);
+  }
+
   // Random glitch (viewport only)
   if (Math.random() < 0.005) {
     var glitchX = Math.floor(Math.random() * 8) - 4;
@@ -5691,6 +5730,7 @@ function runDreamGame(onComplete) {
   var enemies = [];
   var projectiles = [];
   var screenShakeTimer = 0;
+  var whiteFlashTimer = 0;
   var usedCells = {};
   function spawnEnemy(type, hp, speed, sizeMul) {
     for (var i = 0; i < spawnCells.length; i++) {
@@ -5709,7 +5749,8 @@ function runDreamGame(onComplete) {
   spawnEnemy('boss', 5, 0, 1.5);
   var numBrutes = 2 + Math.floor(Math.random() * 2);
   for (var bsi = 0; bsi < numBrutes; bsi++) spawnEnemy('brute', 3, 0.015, 1.25);
-  var numShamblers = 5 + Math.floor(Math.random() * 2);
+  var moraleAdj = (gameState.morale <= 30) ? 2 : (gameState.morale > 60) ? -1 : 0;
+  var numShamblers = Math.max(2, 5 + Math.floor(Math.random() * 2) + moraleAdj);
   for (var ssi = 0; ssi < numShamblers; ssi++) spawnEnemy('shambler', 1, 0.02, 1.0);
   var numEnemies = enemies.length;
 
@@ -5729,9 +5770,7 @@ function runDreamGame(onComplete) {
 
   var DURATION = 30000;
   var startTime = Date.now();
-  var msgEl     = document.getElementById('dreamMessage');
   var hitFlash  = document.getElementById('dreamHitFlash');
-  var hud       = document.getElementById('dreamHUD');
   var crt       = document.querySelector('.crt');
   var controls  = document.getElementById('dreamControls');
   var joyZone   = document.getElementById('dreamJoystick');
@@ -5845,6 +5884,7 @@ function runDreamGame(onComplete) {
               }
             }
             screenShakeTimer = 30;
+            whiteFlashTimer = 4;
             if (dreamAudioRef && dreamAudioRef.stopHeartbeat) dreamAudioRef.stopHeartbeat();
             if (dreamAudioRef && dreamAudioRef.playEnemyDeath) dreamAudioRef.playEnemyDeath();
             if (dukeVoiceRef) dukeVoiceRef.speakVictory();
@@ -5852,10 +5892,11 @@ function runDreamGame(onComplete) {
               if (!finished) {
                 var bScore = Math.min(100, 80 + killCount * 2);
                 finish({ score: bScore, tier: 'good', hits: killCount, misses: 0, penalties: 0,
-                         statBonus: { morale: 10, energy: 5 } });
+                         statBonus: { morale: 15, energy: 10 } });
               }
             }, 600);
           } else {
+            if (screenShakeTimer < 10) screenShakeTimer = 10;
             if (dreamAudioRef && dreamAudioRef.playEnemyDeath) dreamAudioRef.playEnemyDeath();
             if (dukeVoiceRef) dukeVoiceRef.speakKill();
           }
@@ -5889,31 +5930,72 @@ function runDreamGame(onComplete) {
     document.removeEventListener('keydown',  onKeyDown);
     document.removeEventListener('keyup',    onKeyUp);
     canvas.removeEventListener('mousedown',  onMouseDown);
-    hud.style.display = 'none';
     controls.style.display = 'none';
     overlay.classList.remove('touch-active');
     crt.classList.remove('dreaming');
 
     if (dreamAudioRef) {
-      // Only play generic exit whoosh for non-good outcomes;
-      // good outcome already played playExitFound() before finish() was called
       if (outcome.tier !== 'good' && dreamAudioRef.playExit) dreamAudioRef.playExit();
       setTimeout(function() {
         if (dreamAudioRef && dreamAudioRef.stopAll) dreamAudioRef.stopAll();
         dreamAudioRef = null;
         if (dukeVoiceRef) { dukeVoiceRef.stop(); dukeVoiceRef = null; }
-      }, 1200);
+      }, 2500);
     }
 
-    var msg = outcome.tier === 'good' ? 'EXIT FOUND'
-            : outcome.tier === 'bad'  ? 'YOU DIED'
-            : 'SIGNAL LOST';
-    msgEl.textContent = msg;
-    msgEl.classList.add('active');
-    setTimeout(function() {
-      msgEl.classList.remove('active');
-      onComplete(outcome);
-    }, 2000);
+    // Canvas-based end screen animation
+    var endFrame = 0;
+    var endRaf = null;
+    function endLoop() {
+      endFrame++;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, 320, 200);
+
+      if (outcome.tier === 'good') {
+        // Victory screen
+        ctx.font = 'bold 18px VT323, monospace';
+        ctx.fillStyle = '#ffaa00';
+        ctx.textAlign = 'center';
+        ctx.fillText('HAIL TO THE KING', 160, 88);
+        ctx.font = '14px VT323, monospace';
+        ctx.fillStyle = '#ff6600';
+        ctx.fillText('BABY', 160, 110);
+        ctx.font = '8px monospace';
+        ctx.fillStyle = '#888888';
+        ctx.fillText('KILLS: ' + (outcome.hits || 0) + '  SCORE: ' + (outcome.score || 0), 160, 140);
+        ctx.textAlign = 'left';
+      } else if (outcome.tier === 'bad') {
+        // Death screen — red pulse
+        var redA = 0.5 + 0.2 * Math.sin(endFrame * 0.15);
+        ctx.fillStyle = 'rgba(80,0,0,' + redA + ')';
+        ctx.fillRect(0, 0, 320, 200);
+        ctx.font = 'bold 22px VT323, monospace';
+        ctx.fillStyle = '#ff2222';
+        ctx.textAlign = 'center';
+        ctx.fillText('YOU DIED', 160, 100);
+        ctx.textAlign = 'left';
+      } else {
+        // Timeout — CRT shutdown effect
+        var progress = Math.min(1, endFrame / 30);
+        if (progress < 0.7) {
+          var lineH = Math.max(1, Math.floor(200 * (1 - progress / 0.7)));
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, Math.floor((200 - lineH) / 2), 320, lineH);
+        } else {
+          var dotProg = (progress - 0.7) / 0.3;
+          var lineW = Math.max(2, Math.floor(320 * (1 - dotProg)));
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(Math.floor((320 - lineW) / 2), 99, lineW, 2);
+        }
+      }
+
+      if (endFrame < 120) {
+        endRaf = requestAnimationFrame(endLoop);
+      } else {
+        onComplete(outcome);
+      }
+    }
+    endLoop();
   }
 
   if (dreamAudioRef && dreamAudioRef.startDrone) dreamAudioRef.startDrone();
@@ -5931,7 +6013,7 @@ function runDreamGame(onComplete) {
       var tScore = Math.min(100, 20 + killCount * 3);
       var tTier  = killCount >= 3 ? 'neutral' : 'bad';
       finish({ score: tScore, tier: tTier, hits: killCount, misses: 0, penalties: 0,
-               statBonus: tTier === 'neutral' ? { morale: 3, energy: 0 } : { morale: -5, energy: -3 } });
+               statBonus: tTier === 'neutral' ? { morale: 5, energy: 5 } : { morale: -5, energy: -3 } });
       return;
     }
 
@@ -5987,7 +6069,7 @@ function runDreamGame(onComplete) {
       var eScore = Math.min(100, 60 + killCount * 5);
       var eTier  = eScore >= 70 ? 'good' : 'neutral';
       finish({ score: eScore, tier: eTier, hits: killCount, misses: 0, penalties: 0,
-               statBonus: eTier === 'good' ? { morale: 8, energy: 5 } : { morale: 3, energy: 0 } });
+               statBonus: eTier === 'good' ? { morale: 15, energy: 10 } : { morale: 5, energy: 5 } });
       return;
     }
 
@@ -5997,6 +6079,7 @@ function runDreamGame(onComplete) {
       if (enemies[et].deathTimer > 0) enemies[et].deathTimer--;
     }
     if (screenShakeTimer > 0) screenShakeTimer--;
+    if (whiteFlashTimer > 0) whiteFlashTimer--;
 
     // Enemy movement + damage + boss projectiles
     damageTimer++;
@@ -6094,7 +6177,9 @@ function runDreamGame(onComplete) {
     renderFrame(ctx, lastRays, player, enemies, weapon, introAlpha, {
       hp: playerHP, kills: killCount, totalEnemies: numEnemies,
       elapsed: elapsed, duration: DURATION, frameCount: frameCount,
-      projectiles: projectiles, screenShake: screenShakeTimer > 0
+      projectiles: projectiles, screenShake: screenShakeTimer > 0,
+      shakeAmount: screenShakeTimer > 20 ? 6 : 3,
+      whiteFlash: whiteFlashTimer > 0
     });
 
     rafId = requestAnimationFrame(loop);
@@ -6239,6 +6324,7 @@ function applyDreamOutcome(outcome) {
 function initDukeDreamVoice() {
   if (typeof speechSynthesis === 'undefined') return null;
 
+  var pName = (typeof character !== 'undefined' && character.name) ? character.name : '';
   var ENTRY_QUOTES = [
     "It's time to kick ass and chew canned rations... and I'm all outta rations.",
     "Wakey wakey, uglies. Your worst nightmare just showed up.",
@@ -6246,6 +6332,7 @@ function initDukeDreamVoice() {
     "Let's rock.",
     "Damn, I hate these apocalypse dreams. Oh wait, no I don't."
   ];
+  if (pName) ENTRY_QUOTES.push(pName + "'s ready for action.");
 
   var KILL_QUOTES = [
     "Heh heh heh... should've stayed irradiated.",
@@ -6274,6 +6361,7 @@ function initDukeDreamVoice() {
     "Hail to the king, baby.",
     "I'm the last man standing. Again."
   ];
+  if (pName) VICTORY_QUOTES.push("The name's " + pName + ". Remember it.");
 
   var TIMEOUT_QUOTE = "Damn. I was just getting warmed up.";
   var DEATH_QUOTE = "Even in my dreams, I can't catch a break.";
