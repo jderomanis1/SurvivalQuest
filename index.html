@@ -5845,6 +5845,7 @@ function runDreamGame(onComplete) {
               }
             }
             screenShakeTimer = 30;
+            if (dreamAudioRef && dreamAudioRef.stopHeartbeat) dreamAudioRef.stopHeartbeat();
             if (dreamAudioRef && dreamAudioRef.playEnemyDeath) dreamAudioRef.playEnemyDeath();
             if (dukeVoiceRef) dukeVoiceRef.speakVictory();
             setTimeout(function() {
@@ -5916,6 +5917,7 @@ function runDreamGame(onComplete) {
   }
 
   if (dreamAudioRef && dreamAudioRef.startDrone) dreamAudioRef.startDrone();
+  if (dreamAudioRef && dreamAudioRef.startMusic) dreamAudioRef.startMusic();
   setTimeout(function() { if (dukeVoiceRef && !finished) dukeVoiceRef.speakEntry(); }, 1500);
 
   function loop() {
@@ -5971,9 +5973,9 @@ function runDreamGame(onComplete) {
       player.y = moveY > 0 ? Math.floor(ny) - MARGIN : Math.ceil(ny) + MARGIN;
     }
 
-    // Footstep sound every 20 frames while moving
+    // Footstep sound every 18 frames while moving
     frameCount++;
-    if ((moveX !== 0 || moveY !== 0) && frameCount % 20 === 0) {
+    if ((moveX !== 0 || moveY !== 0) && frameCount % 18 === 0) {
       if (dreamAudioRef && dreamAudioRef.playFootstep) dreamAudioRef.playFootstep();
     }
 
@@ -6002,16 +6004,21 @@ function runDreamGame(onComplete) {
       var en = enemies[ei];
       if (!en.alive) continue;
 
-      // Boss: stationary, fires projectiles
+      // Boss: stationary, fires projectiles, heartbeat audio
       if (en.type === 'boss') {
+        var bossDx = player.x - en.x, bossDy = player.y - en.y;
+        var bossDist = Math.sqrt(bossDx * bossDx + bossDy * bossDy);
+        if (bossDist < 8 && dreamAudioRef && dreamAudioRef.startHeartbeat) {
+          dreamAudioRef.startHeartbeat(en.hp, en.maxHp);
+        } else if (bossDist >= 8 && dreamAudioRef && dreamAudioRef.stopHeartbeat) {
+          dreamAudioRef.stopHeartbeat();
+        }
         en.fireTimer++;
         if (en.fireTimer >= 50) {
           en.fireTimer = 0;
-          var bpdx = player.x - en.x, bpdy = player.y - en.y;
-          var bpDist = Math.sqrt(bpdx * bpdx + bpdy * bpdy);
-          if (bpDist > 0.1) {
+          if (bossDist > 0.1) {
             projectiles.push({ x: en.x, y: en.y,
-              dx: (bpdx / bpDist) * 0.06, dy: (bpdy / bpDist) * 0.06, alive: true });
+              dx: (bossDx / bossDist) * 0.06, dy: (bossDy / bossDist) * 0.06, alive: true });
           }
         }
         continue;
@@ -6460,43 +6467,82 @@ function initDreamAudio() {
   function playShotgun() {
     if (!ok()) return;
     var ctx = getAudioCtx(), t = ctx.currentTime;
-    // Noise burst through bandpass at 800Hz
-    var bufSize = Math.floor(ctx.sampleRate * 0.1);
+    // Main blast — noise burst through distortion + bandpass
+    var bufSize = Math.floor(ctx.sampleRate * 0.12);
     var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
     var d = buf.getChannelData(0);
     for (var i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
     var src = track(ctx.createBufferSource());
     src.buffer = buf;
+    var dist = makeDistortion(80);
     var bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = 800; bp.Q.value = 1;
+    bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
     var g = ctx.createGain();
-    g.gain.setValueAtTime(0.3, t);
-    g.gain.linearRampToValueAtTime(0, t + 0.1);
-    src.connect(bp); bp.connect(g); g.connect(dreamGain);
-    src.start(t); src.stop(t + 0.11);
-    // Low thud
+    g.gain.setValueAtTime(0.4, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.12);
+    src.connect(dist); dist.connect(bp); bp.connect(g); g.connect(dreamGain);
+    src.start(t); src.stop(t + 0.13);
+    // Low thud — heavier
     var thud = track(ctx.createOscillator());
-    thud.type = 'sine'; thud.frequency.value = 60;
+    thud.type = 'sine'; thud.frequency.value = 55;
     var tg = ctx.createGain();
-    tg.gain.setValueAtTime(0.3, t);
-    tg.gain.linearRampToValueAtTime(0, t + 0.08);
+    tg.gain.setValueAtTime(0.35, t);
+    tg.gain.linearRampToValueAtTime(0, t + 0.1);
     thud.connect(tg); tg.connect(dreamGain);
-    thud.start(t); thud.stop(t + 0.09);
+    thud.start(t); thud.stop(t + 0.11);
+    // Pump-action sound — delayed noise with bandpass sweep
+    var pBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate);
+    var pd = pBuf.getChannelData(0);
+    for (var j = 0; j < pd.length; j++) pd[j] = Math.random() * 2 - 1;
+    var pSrc = track(ctx.createBufferSource());
+    pSrc.buffer = pBuf;
+    var pBp = ctx.createBiquadFilter();
+    pBp.type = 'bandpass'; pBp.Q.value = 2;
+    pBp.frequency.setValueAtTime(2000, t + 0.2);
+    pBp.frequency.linearRampToValueAtTime(500, t + 0.4);
+    var pg = ctx.createGain();
+    pg.gain.setValueAtTime(0, t);
+    pg.gain.setValueAtTime(0.15, t + 0.2);
+    pg.gain.linearRampToValueAtTime(0, t + 0.4);
+    pSrc.connect(pBp); pBp.connect(pg); pg.connect(dreamGain);
+    pSrc.start(t + 0.2); pSrc.stop(t + 0.42);
   }
 
   function playEnemyDeath() {
     if (!ok()) return;
     var ctx = getAudioCtx(), t = ctx.currentTime;
+    // Descending distorted sawtooth
     var osc = track(ctx.createOscillator());
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(400, t);
     osc.frequency.linearRampToValueAtTime(80, t + 0.3);
-    var dist = makeDistortion(40);
+    var dist = makeDistortion(60);
     var g = ctx.createGain();
-    g.gain.setValueAtTime(0.2, t);
+    g.gain.setValueAtTime(0.25, t);
     g.gain.linearRampToValueAtTime(0, t + 0.3);
     osc.connect(dist); dist.connect(g); g.connect(dreamGain);
     osc.start(t); osc.stop(t + 0.32);
+    // Wet splat — noise through lowpass
+    var sBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.15), ctx.sampleRate);
+    var sd = sBuf.getChannelData(0);
+    for (var i = 0; i < sd.length; i++) sd[i] = Math.random() * 2 - 1;
+    var sSrc = track(ctx.createBufferSource());
+    sSrc.buffer = sBuf;
+    var lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 400; lp.Q.value = 1;
+    var sg = ctx.createGain();
+    sg.gain.setValueAtTime(0.2, t);
+    sg.gain.linearRampToValueAtTime(0, t + 0.15);
+    sSrc.connect(lp); lp.connect(sg); sg.connect(dreamGain);
+    sSrc.start(t); sSrc.stop(t + 0.16);
+    // Low thud
+    var thud = track(ctx.createOscillator());
+    thud.type = 'sine'; thud.frequency.value = 80;
+    var tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.2, t);
+    tg.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    thud.connect(tg); tg.connect(dreamGain);
+    thud.start(t); thud.stop(t + 0.12);
   }
 
   function playEnemyHit() {
@@ -6514,38 +6560,59 @@ function initDreamAudio() {
   function playPlayerHurt() {
     if (!ok()) return;
     var ctx = getAudioCtx(), t = ctx.currentTime;
-    // Red noise burst
-    var bufSize = Math.floor(ctx.sampleRate * 0.15);
+    // Sharp noise burst through highpass for bite
+    var bufSize = Math.floor(ctx.sampleRate * 0.12);
     var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
     var d = buf.getChannelData(0);
     for (var i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
     var src = track(ctx.createBufferSource());
     src.buffer = buf;
+    var hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 2000; hp.Q.value = 1;
     var g = ctx.createGain();
-    g.gain.setValueAtTime(0.25, t);
-    g.gain.linearRampToValueAtTime(0, t + 0.15);
-    src.connect(g); g.connect(dreamGain);
-    src.start(t); src.stop(t + 0.16);
-    // Alarm sine
+    g.gain.setValueAtTime(0.3, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.12);
+    src.connect(hp); hp.connect(g); g.connect(dreamGain);
+    src.start(t); src.stop(t + 0.13);
+    // Alarm sine — higher pitch, sharper
     var osc = track(ctx.createOscillator());
-    osc.type = 'sine'; osc.frequency.value = 100;
+    osc.type = 'square'; osc.frequency.value = 220;
     var og = ctx.createGain();
-    og.gain.setValueAtTime(0.25, t);
-    og.gain.linearRampToValueAtTime(0, t + 0.15);
+    og.gain.setValueAtTime(0.15, t);
+    og.gain.linearRampToValueAtTime(0, t + 0.1);
     osc.connect(og); og.connect(dreamGain);
-    osc.start(t); osc.stop(t + 0.16);
+    osc.start(t); osc.stop(t + 0.11);
+    // Low grunt
+    var grunt = track(ctx.createOscillator());
+    grunt.type = 'sine'; grunt.frequency.value = 120;
+    var gg = ctx.createGain();
+    gg.gain.setValueAtTime(0.2, t);
+    gg.gain.linearRampToValueAtTime(0, t + 0.06);
+    grunt.connect(gg); gg.connect(dreamGain);
+    grunt.start(t); grunt.stop(t + 0.07);
   }
 
+  var footstepAlt = 0;
   function playFootstep() {
     if (!ok()) return;
     var ctx = getAudioCtx(), t = ctx.currentTime;
+    footstepAlt = 1 - footstepAlt;
+    var freq = footstepAlt ? 80 : 95;
     var osc = track(ctx.createOscillator());
-    osc.type = 'sine'; osc.frequency.value = 800;
+    osc.type = 'sine'; osc.frequency.value = freq;
     var g = ctx.createGain();
-    g.gain.setValueAtTime(0.05, t);
-    g.gain.linearRampToValueAtTime(0, t + 0.02);
+    g.gain.setValueAtTime(0.08, t);
+    g.gain.linearRampToValueAtTime(0, t + 0.04);
     osc.connect(g); g.connect(dreamGain);
-    osc.start(t); osc.stop(t + 0.022);
+    osc.start(t); osc.stop(t + 0.045);
+    // Click layer
+    var click = track(ctx.createOscillator());
+    click.type = 'square'; click.frequency.value = footstepAlt ? 600 : 700;
+    var cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.03, t);
+    cg.gain.linearRampToValueAtTime(0, t + 0.015);
+    click.connect(cg); cg.connect(dreamGain);
+    click.start(t); click.stop(t + 0.018);
   }
 
   function playExitFound() {
@@ -6563,7 +6630,123 @@ function initDreamAudio() {
     osc.start(t); osc.stop(t + 0.52);
   }
 
+  // ── Driving music loop ──
+  var musicTimer = null;
+  function startMusic() {
+    if (!ok()) return;
+    var ctx = getAudioCtx();
+    var musicGain = ctx.createGain();
+    musicGain.gain.value = 0.12;
+    musicGain.connect(dreamGain);
+
+    // A minor riff: 4 bars × 4 notes, 140 BPM (~107ms per note)
+    var bars = [
+      [110, 110, 131, 110],  // Am
+      [82,  82,  98,  82],   // Em
+      [87,  87,  110, 87],   // Fm
+      [82,  82,  73,  82]    // Em/D
+    ];
+    var noteLen = 0.09; // 90ms on
+    var noteGap = 0.017; // 17ms off
+    var notePeriod = noteLen + noteGap; // ~107ms
+    var barLen = notePeriod * 4;
+    var loopLen = barLen * 4;
+    // Hi-hat: 8 per bar (every half-note)
+    var hatPeriod = notePeriod / 2;
+
+    var playing = true;
+    function scheduleLoop() {
+      if (!playing || !dreamGain) return;
+      var ctx2 = getAudioCtx();
+      if (!ctx2) return;
+      var t = ctx2.currentTime + 0.05; // slight lookahead
+
+      for (var bar = 0; bar < 4; bar++) {
+        for (var note = 0; note < 4; note++) {
+          var nt = t + bar * barLen + note * notePeriod;
+          var osc = track(ctx2.createOscillator());
+          osc.type = 'square';
+          osc.frequency.value = bars[bar][note];
+          var ng = ctx2.createGain();
+          ng.gain.setValueAtTime(1, nt);
+          ng.gain.setValueAtTime(0, nt + noteLen);
+          osc.connect(ng); ng.connect(musicGain);
+          osc.start(nt); osc.stop(nt + noteLen + 0.01);
+        }
+        // Hi-hats — 8 per bar
+        for (var h = 0; h < 8; h++) {
+          var ht = t + bar * barLen + h * hatPeriod;
+          var hBuf = ctx2.createBuffer(1, Math.floor(ctx2.sampleRate * 0.015), ctx2.sampleRate);
+          var hd = hBuf.getChannelData(0);
+          for (var hi = 0; hi < hd.length; hi++) hd[hi] = Math.random() * 2 - 1;
+          var hSrc = track(ctx2.createBufferSource());
+          hSrc.buffer = hBuf;
+          var hHp = ctx2.createBiquadFilter();
+          hHp.type = 'highpass'; hHp.frequency.value = 8000;
+          var hg = ctx2.createGain();
+          hg.gain.setValueAtTime(0.4, ht);
+          hg.gain.linearRampToValueAtTime(0, ht + 0.015);
+          hSrc.connect(hHp); hHp.connect(hg); hg.connect(musicGain);
+          hSrc.start(ht); hSrc.stop(ht + 0.02);
+        }
+      }
+
+      musicTimer = setTimeout(function() { scheduleLoop(); }, (loopLen - 0.1) * 1000);
+    }
+    scheduleLoop();
+
+    // Store stop handle
+    startMusic._stop = function() { playing = false; if (musicTimer) clearTimeout(musicTimer); musicTimer = null; };
+  }
+
+  // ── Boss heartbeat ──
+  var heartbeatTimer = null;
+  var heartbeatPlaying = false;
+  function startHeartbeat(bossHp, bossMaxHp) {
+    if (!ok() || heartbeatPlaying) return;
+    heartbeatPlaying = true;
+    function beat() {
+      if (!heartbeatPlaying || !dreamGain) return;
+      var ctx2 = getAudioCtx();
+      if (!ctx2) return;
+      var t = ctx2.currentTime;
+      // Double-beat (lub-dub)
+      var osc1 = track(ctx2.createOscillator());
+      osc1.type = 'sine'; osc1.frequency.value = 40;
+      var g1 = ctx2.createGain();
+      g1.gain.setValueAtTime(0.15, t);
+      g1.gain.linearRampToValueAtTime(0, t + 0.08);
+      osc1.connect(g1); g1.connect(dreamGain);
+      osc1.start(t); osc1.stop(t + 0.09);
+      var osc2 = track(ctx2.createOscillator());
+      osc2.type = 'sine'; osc2.frequency.value = 35;
+      var g2 = ctx2.createGain();
+      g2.gain.setValueAtTime(0.12, t + 0.12);
+      g2.gain.linearRampToValueAtTime(0, t + 0.18);
+      osc2.connect(g2); g2.connect(dreamGain);
+      osc2.start(t + 0.12); osc2.stop(t + 0.2);
+      // Interval decreases as boss HP drops
+      var hpRatio = Math.max(0.1, (bossHp || 1) / (bossMaxHp || 5));
+      var interval = 250 + Math.floor(hpRatio * 350); // 250-600ms
+      heartbeatTimer = setTimeout(beat, interval);
+    }
+    beat();
+  }
+  function stopHeartbeat() {
+    heartbeatPlaying = false;
+    if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null; }
+  }
+  function updateHeartbeat(bossHp, bossMaxHp) {
+    // Just update the reference for next beat interval
+    if (heartbeatPlaying) {
+      startHeartbeat.bossHp = bossHp;
+      startHeartbeat.bossMaxHp = bossMaxHp;
+    }
+  }
+
   function stopAll() {
+    if (startMusic._stop) startMusic._stop();
+    stopHeartbeat();
     for (var i = 0; i < nodes.length; i++) {
       try { nodes[i].stop(); } catch(e) {}
       try { nodes[i].disconnect(); } catch(e) {}
@@ -6574,18 +6757,21 @@ function initDreamAudio() {
   }
 
   return {
-    startEntry:    startEntry,
-    startDrone:    startDrone,
-    playCorrect:   playCorrect,
-    playWrong:     playWrong,
-    playExit:      playExit,
-    playShotgun:   playShotgun,
+    startEntry:     startEntry,
+    startDrone:     startDrone,
+    startMusic:     startMusic,
+    startHeartbeat: startHeartbeat,
+    stopHeartbeat:  stopHeartbeat,
+    playCorrect:    playCorrect,
+    playWrong:      playWrong,
+    playExit:       playExit,
+    playShotgun:    playShotgun,
     playEnemyDeath: playEnemyDeath,
-    playEnemyHit:  playEnemyHit,
+    playEnemyHit:   playEnemyHit,
     playPlayerHurt: playPlayerHurt,
-    playFootstep:  playFootstep,
-    playExitFound: playExitFound,
-    stopAll:       stopAll
+    playFootstep:   playFootstep,
+    playExitFound:  playExitFound,
+    stopAll:        stopAll
   };
 }
 </script>
