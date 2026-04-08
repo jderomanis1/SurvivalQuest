@@ -2714,6 +2714,7 @@ var dreamSequenceUsed = { morale: false, artifact: false, day7: false };
 var dreamAudioRef = null;
 var dukeVoiceRef = null;
 var dreamTextures = null;
+var enemySprites = null;
 var gameState = {
   morale:    75,
   hunger:    80,
@@ -5096,6 +5097,114 @@ function generateDreamTextures() {
   return textures;
 }
 
+function generateEnemySprites() {
+  var sprites = {};
+
+  function makeHurt(canvas) {
+    var c = document.createElement('canvas');
+    c.width = canvas.width; c.height = canvas.height;
+    var cx = c.getContext('2d');
+    cx.drawImage(canvas, 0, 0);
+    cx.globalCompositeOperation = 'source-atop';
+    cx.fillStyle = '#ffffff';
+    cx.fillRect(0, 0, c.width, c.height);
+    return c;
+  }
+  function makeDeath(canvas) {
+    var c = document.createElement('canvas');
+    c.width = canvas.width; c.height = canvas.height;
+    var cx = c.getContext('2d');
+    cx.drawImage(canvas, 0, 0);
+    cx.globalCompositeOperation = 'source-atop';
+    cx.fillStyle = '#cc0000';
+    cx.fillRect(0, 0, c.width, c.height);
+    return c;
+  }
+
+  // ── Shambler (32×48) ──
+  var sc = document.createElement('canvas'); sc.width = 32; sc.height = 48;
+  var sx = sc.getContext('2d');
+  sx.fillStyle = '#5a6a5a';
+  sx.beginPath(); sx.ellipse(16, 8, 6, 7, 0, 0, Math.PI * 2); sx.fill();
+  sx.fillStyle = '#00ff00';
+  sx.fillRect(12, 6, 2, 2); sx.fillRect(18, 6, 2, 2);
+  sx.fillStyle = '#5a6a5a';
+  sx.fillRect(8, 14, 16, 18);
+  sx.fillStyle = '#4a5a4a';
+  sx.fillRect(10, 18, 4, 3); sx.fillRect(18, 20, 3, 4);
+  sx.fillStyle = '#6b4423';
+  sx.fillRect(9, 22, 5, 2); sx.fillRect(18, 25, 4, 2); sx.fillRect(11, 28, 3, 2);
+  sx.fillStyle = '#5a6a5a';
+  sx.fillRect(3, 16, 5, 10); sx.fillRect(24, 16, 5, 10);
+  sx.fillStyle = '#4a5a4a';
+  sx.fillRect(2, 26, 4, 3); sx.fillRect(26, 26, 4, 3);
+  sx.fillRect(10, 32, 5, 12); sx.fillRect(17, 32, 5, 12);
+  sx.fillStyle = '#3a4a3a';
+  sx.fillRect(8, 43, 7, 5); sx.fillRect(17, 43, 7, 5);
+  sprites.shambler = { normal: sc, hurt: makeHurt(sc), death: makeDeath(sc), w: 32, h: 48 };
+
+  // ── Brute (40×56) ──
+  var bc = document.createElement('canvas'); bc.width = 40; bc.height = 56;
+  var bx = bc.getContext('2d');
+  bx.fillStyle = '#4a4a4a';
+  bx.beginPath(); bx.ellipse(20, 9, 8, 8, 0, 0, Math.PI * 2); bx.fill();
+  bx.fillStyle = '#ffff00';
+  bx.fillRect(14, 7, 3, 3); bx.fillRect(23, 7, 3, 3);
+  bx.fillStyle = '#4a4a4a';
+  bx.fillRect(6, 17, 28, 22);
+  bx.fillStyle = '#ff4444';
+  bx.fillRect(10, 20, 5, 4); bx.fillRect(25, 22, 4, 5); bx.fillRect(14, 30, 6, 3);
+  bx.fillStyle = '#3a3a3a';
+  bx.fillRect(18, 20, 4, 4); bx.fillRect(8, 28, 5, 3);
+  bx.fillStyle = '#4a4a4a';
+  bx.fillRect(1, 18, 5, 14); bx.fillRect(34, 18, 5, 14);
+  bx.fillStyle = '#3a3a3a';
+  bx.fillRect(0, 32, 6, 4); bx.fillRect(34, 32, 6, 4);
+  bx.fillRect(10, 39, 7, 12); bx.fillRect(23, 39, 7, 12);
+  bx.fillStyle = '#2a2a2a';
+  bx.fillRect(8, 50, 9, 6); bx.fillRect(23, 50, 9, 6);
+  sprites.brute = { normal: bc, hurt: makeHurt(bc), death: makeDeath(bc), w: 40, h: 56 };
+
+  // ── Boss / Hive Mind (48×64) ──
+  var oc = document.createElement('canvas'); oc.width = 48; oc.height = 64;
+  var ox = oc.getContext('2d');
+  ox.strokeStyle = '#880088'; ox.lineWidth = 3;
+  for (var t = 0; t < 6; t++) {
+    var ta = (t / 6) * Math.PI * 2;
+    var ttx = 24 + Math.cos(ta) * 12, tty = 32 + Math.sin(ta) * 12;
+    var tex = 24 + Math.cos(ta) * 22, tey = 32 + Math.sin(ta) * 22;
+    ox.beginPath(); ox.moveTo(ttx, tty);
+    ox.bezierCurveTo(
+      ttx + Math.cos(ta + 0.5) * 8, tty + Math.sin(ta + 0.5) * 8,
+      tex + Math.cos(ta - 0.5) * 5, tey + Math.sin(ta - 0.5) * 5, tex, tey
+    );
+    ox.stroke();
+  }
+  ox.fillStyle = '#4a0066';
+  ox.beginPath(); ox.ellipse(24, 32, 14, 16, 0, 0, Math.PI * 2); ox.fill();
+  ox.strokeStyle = '#6600aa'; ox.lineWidth = 2; ox.stroke();
+  ox.fillStyle = '#ff0000';
+  ox.beginPath(); ox.ellipse(24, 30, 5, 5, 0, 0, Math.PI * 2); ox.fill();
+  ox.fillStyle = '#ffff00'; ox.fillRect(22, 28, 4, 4);
+  var obc = document.createElement('canvas'); obc.width = 48; obc.height = 64;
+  var obx = obc.getContext('2d');
+  obx.drawImage(oc, 0, 0);
+  obx.globalCompositeOperation = 'source-atop';
+  obx.fillStyle = 'rgba(150, 50, 255, 0.25)';
+  obx.fillRect(0, 0, 48, 64);
+  sprites.boss = { normal: oc, bright: obc, hurt: makeHurt(oc), death: makeDeath(oc), w: 48, h: 64 };
+
+  // ── Projectile (8×8) ──
+  var pc = document.createElement('canvas'); pc.width = 8; pc.height = 8;
+  var px = pc.getContext('2d');
+  px.fillStyle = '#00ff44';
+  px.beginPath(); px.arc(4, 4, 3, 0, Math.PI * 2); px.fill();
+  px.fillStyle = '#88ff88'; px.fillRect(3, 3, 2, 2);
+  sprites.projectile = { normal: pc, w: 8, h: 8 };
+
+  return sprites;
+}
+
 function generateDreamMap() {
   var W = 10, H = 10;
   // Start all walls (type 1)
@@ -5249,6 +5358,12 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
   var depthBuffer = rays.depthBuffer;
 
   // ── 3D Viewport (y: 0–160) ──
+  var shaking = hudData && hudData.screenShake;
+  if (shaking) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, CW, VH); ctx.clip();
+    ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6);
+  }
 
   // Subtle green phosphor tint
   ctx.fillStyle = 'rgba(0,20,0,0.05)';
@@ -5292,18 +5407,38 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
     }
   }
 
-  // ── Sprite rendering (clamped to viewport) ──
-  if (enemies && enemies.length) {
-    var sorted = enemies.filter(function(e) { return e.alive; }).map(function(e) {
+  // ── Sprite rendering (enemies + projectiles, clamped to viewport) ──
+  var allSprites = [];
+  if (enemies) {
+    for (var ri = 0; ri < enemies.length; ri++) {
+      if (enemies[ri].alive || enemies[ri].deathTimer > 0) allSprites.push(enemies[ri]);
+    }
+  }
+  if (hudData && hudData.projectiles) {
+    for (var rpi = 0; rpi < hudData.projectiles.length; rpi++) {
+      if (hudData.projectiles[rpi].alive) {
+        allSprites.push({ x: hudData.projectiles[rpi].x, y: hudData.projectiles[rpi].y,
+          type: 'projectile', alive: true, sizeMul: 0.3, hurtTimer: 0, deathTimer: 0 });
+      }
+    }
+  }
+
+  if (allSprites.length && enemySprites) {
+    var sorted = allSprites.map(function(e) {
       var dx = e.x - player.x, dy = e.y - player.y;
       return { e: e, dist2: dx*dx + dy*dy };
     });
     sorted.sort(function(a, b) { return b.dist2 - a.dist2; });
+    var fc = hudData ? hudData.frameCount : 0;
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, CW, VH); ctx.clip();
 
     for (var si = 0; si < sorted.length; si++) {
       var e = sorted[si].e;
-      var dx = e.x - player.x;
-      var dy = e.y - player.y;
+      var spr = enemySprites[e.type];
+      if (!spr) continue;
+      var dx = e.x - player.x, dy = e.y - player.y;
       var dist = Math.sqrt(dx*dx + dy*dy);
       if (dist < 0.1) continue;
 
@@ -5312,33 +5447,34 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
       while (spriteAngle < -Math.PI) spriteAngle += 2 * Math.PI;
       if (Math.abs(spriteAngle) > FOV / 2 + 0.1) continue;
 
-      var spriteH = Math.min(VH, Math.floor(VH / dist));
-      var spriteW = spriteH;
+      var sMul = e.sizeMul || 1.0;
+      var spriteH = Math.min(VH, Math.floor(VH / dist * sMul));
+      var spriteW = Math.max(1, Math.floor(spriteH * spr.w / spr.h));
       var spriteTop = Math.floor((VH - spriteH) / 2);
       var screenCX = Math.floor(((spriteAngle + FOV / 2) / FOV) * CW);
       var colStart = screenCX - Math.floor(spriteW / 2);
       var colEnd   = screenCX + Math.floor(spriteW / 2);
 
+      var sprCanvas;
+      if (!e.alive && e.deathTimer > 0) sprCanvas = spr.death || spr.normal;
+      else if (e.hurtTimer > 0) sprCanvas = spr.hurt || spr.normal;
+      else if (e.type === 'boss' && spr.bright && fc % 60 < 30) sprCanvas = spr.bright;
+      else sprCanvas = spr.normal;
+
+      if (!e.alive && e.deathTimer > 0) ctx.globalAlpha = Math.max(0.1, e.deathTimer / 15);
+
       for (var sc = colStart; sc < colEnd; sc++) {
         if (sc < 0 || sc >= CW) continue;
         if (depthBuffer[sc] < dist) continue;
-        var tx = (sc - colStart) / spriteW;
-
-        var bodyTop    = Math.max(0, spriteTop + Math.floor(spriteH * 0.35));
-        var bodyBottom = Math.min(VH, spriteTop + spriteH);
-        var headTop    = Math.max(0, spriteTop);
-        var headBottom = Math.min(VH, spriteTop + Math.floor(spriteH * 0.35));
-
-        if (bodyBottom > bodyTop) { ctx.fillStyle = '#2d4a1a'; ctx.fillRect(sc, bodyTop, 1, bodyBottom - bodyTop); }
-        if (headBottom > headTop) { ctx.fillStyle = '#3d5a2a'; ctx.fillRect(sc, headTop, 1, headBottom - headTop); }
-
-        var eyeY = headTop + Math.floor((headBottom - headTop) * 0.4);
-        if (eyeY >= 0 && eyeY < VH) {
-          if (tx > 0.25 && tx < 0.38) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
-          if (tx > 0.62 && tx < 0.75) { ctx.fillStyle = '#ff0000'; ctx.fillRect(sc, eyeY, 1, 2); }
-        }
+        var srcX = Math.floor((sc - colStart) / spriteW * spr.w);
+        if (srcX >= spr.w) srcX = spr.w - 1;
+        if (srcX < 0) srcX = 0;
+        ctx.drawImage(sprCanvas, srcX, 0, 1, spr.h, sc, spriteTop, 1, spriteH);
       }
+
+      if (!e.alive && e.deathTimer > 0) ctx.globalAlpha = 1;
     }
+    ctx.restore();
   }
 
   // ── Weapon (positioned for 160px viewport) ──
@@ -5356,6 +5492,8 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
     ctx.fillStyle = '#6b4a2a';
     ctx.fillRect(cx - 20, 130, 40, 30);
   }
+
+  if (shaking) ctx.restore();
 
   // ── Duke-Style HUD Bar (y: 160–200) ──
   if (hudData) {
@@ -5523,21 +5661,61 @@ function runDreamGame(onComplete) {
   if (!dreamTextures) dreamTextures = generateDreamTextures();
   var player = { x: 1.5, y: 1.5, angle: 0, moveSpeed: 0.06, rotSpeed: 0.04 };
 
-  // Spawn 5-7 enemies in empty cells at least 3 cells from (1,1)
-  var enemies = [];
-  var numEnemies = 5 + Math.floor(Math.random() * 3);
-  var spawnAttempts = 0;
-  while (enemies.length < numEnemies && spawnAttempts < 200) {
-    spawnAttempts++;
-    var ex = 1 + Math.floor(Math.random() * (map[0].length - 2));
-    var ey = 1 + Math.floor(Math.random() * (map.length - 2));
-    if (map[ey][ex] !== 0) continue;
-    var spDist = Math.abs(ex - 1) + Math.abs(ey - 1);
-    if (spDist < 3) continue;
-    enemies.push({ x: ex + 0.5, y: ey + 0.5, alive: true, speed: 0.02 });
+  // BFS from player start for spawn placement
+  var spawnDist = [];
+  for (var r = 0; r < map.length; r++) {
+    spawnDist[r] = [];
+    for (var c = 0; c < map[0].length; c++) spawnDist[r][c] = -1;
   }
+  var spawnQ = [{x:1, y:1, d:0}]; spawnDist[1][1] = 0;
+  var spawnCells = [];
+  while (spawnQ.length) {
+    var cur = spawnQ.shift();
+    if (map[cur.y][cur.x] === 0 && cur.d >= 3) spawnCells.push(cur);
+    var nb = [[0,1],[0,-1],[1,0],[-1,0]];
+    for (var n = 0; n < nb.length; n++) {
+      var snx = cur.x + nb[n][1], sny = cur.y + nb[n][0];
+      if (snx >= 0 && snx < map[0].length && sny >= 0 && sny < map.length &&
+          (map[sny][snx] === 0 || map[sny][snx] === 4) && spawnDist[sny][snx] === -1) {
+        spawnDist[sny][snx] = cur.d + 1;
+        spawnQ.push({x: snx, y: sny, d: cur.d + 1});
+      }
+    }
+  }
+  for (var si3 = spawnCells.length - 1; si3 > 0; si3--) {
+    var sj2 = Math.floor(Math.random() * (si3 + 1));
+    var tmp2 = spawnCells[si3]; spawnCells[si3] = spawnCells[sj2]; spawnCells[sj2] = tmp2;
+  }
+  spawnCells.sort(function(a, b) { return b.d - a.d; });
 
-  var weapon     = { type: 'shotgun', ammo: 12, cooldown: 0, firing: false };
+  var enemies = [];
+  var projectiles = [];
+  var screenShakeTimer = 0;
+  var usedCells = {};
+  function spawnEnemy(type, hp, speed, sizeMul) {
+    for (var i = 0; i < spawnCells.length; i++) {
+      var c = spawnCells[i];
+      var key = c.x + ',' + c.y;
+      if (usedCells[key]) continue;
+      usedCells[key] = true;
+      enemies.push({
+        x: c.x + 0.5, y: c.y + 0.5, alive: true, speed: speed,
+        type: type, hp: hp, maxHp: hp, hurtTimer: 0, deathTimer: 0,
+        sizeMul: sizeMul, fireTimer: 0
+      });
+      return;
+    }
+  }
+  spawnEnemy('boss', 5, 0, 1.5);
+  var numBrutes = 2 + Math.floor(Math.random() * 2);
+  for (var bsi = 0; bsi < numBrutes; bsi++) spawnEnemy('brute', 3, 0.015, 1.25);
+  var numShamblers = 5 + Math.floor(Math.random() * 2);
+  for (var ssi = 0; ssi < numShamblers; ssi++) spawnEnemy('shambler', 1, 0.02, 1.0);
+  var numEnemies = enemies.length;
+
+  if (!enemySprites) enemySprites = generateEnemySprites();
+
+  var weapon     = { type: 'shotgun', ammo: 20, cooldown: 0, firing: false };
   var killCount  = 0;
   var playerHP   = 100;
   var damageTimer = 0;
@@ -5646,20 +5824,44 @@ function runDreamGame(onComplete) {
       if (Math.abs(sa) > FOV / 2 + 0.1) continue;
 
       var screenCX = Math.floor(((sa + FOV / 2) / FOV) * CW);
-      var spriteH  = Math.min(VH, Math.floor(VH / eDist));
+      var spriteH  = Math.min(VH, Math.floor(VH / eDist * (en.sizeMul || 1)));
       var half     = Math.floor(spriteH / 2);
       var colStart = screenCX - half, colEnd = screenCX + half;
 
       var depthOk = !lastRays || lastRays.depthBuffer[160] >= eDist;
       if (colStart <= 160 && colEnd >= 160 && depthOk) {
-        en.alive = false;
-        killCount++;
-        if (dreamAudioRef && dreamAudioRef.playEnemyDeath) dreamAudioRef.playEnemyDeath();
-        if (dukeVoiceRef) {
-          if (killCount >= numEnemies) dukeVoiceRef.speakVictory();
-          else dukeVoiceRef.speakKill();
+        en.hp--;
+        en.hurtTimer = 4;
+        if (en.hp <= 0) {
+          en.alive = false;
+          en.deathTimer = 15;
+          killCount++;
+          if (en.type === 'boss') {
+            for (var bk = 0; bk < enemies.length; bk++) {
+              if (enemies[bk].alive && enemies[bk] !== en) {
+                enemies[bk].alive = false;
+                enemies[bk].deathTimer = 15;
+                killCount++;
+              }
+            }
+            screenShakeTimer = 30;
+            if (dreamAudioRef && dreamAudioRef.playEnemyDeath) dreamAudioRef.playEnemyDeath();
+            if (dukeVoiceRef) dukeVoiceRef.speakVictory();
+            setTimeout(function() {
+              if (!finished) {
+                var bScore = Math.min(100, 80 + killCount * 2);
+                finish({ score: bScore, tier: 'good', hits: killCount, misses: 0, penalties: 0,
+                         statBonus: { morale: 10, energy: 5 } });
+              }
+            }, 600);
+          } else {
+            if (dreamAudioRef && dreamAudioRef.playEnemyDeath) dreamAudioRef.playEnemyDeath();
+            if (dukeVoiceRef) dukeVoiceRef.speakKill();
+          }
+        } else {
+          if (dreamAudioRef && dreamAudioRef.playEnemyHit) dreamAudioRef.playEnemyHit();
         }
-        break; // one kill per shot
+        break;
       }
     }
   }
@@ -5787,17 +5989,41 @@ function runDreamGame(onComplete) {
       return;
     }
 
-    // Enemy movement + damage
+    // Update enemy timers
+    for (var et = 0; et < enemies.length; et++) {
+      if (enemies[et].hurtTimer > 0) enemies[et].hurtTimer--;
+      if (enemies[et].deathTimer > 0) enemies[et].deathTimer--;
+    }
+    if (screenShakeTimer > 0) screenShakeTimer--;
+
+    // Enemy movement + damage + boss projectiles
     damageTimer++;
     for (var ei = 0; ei < enemies.length; ei++) {
       var en = enemies[ei];
       if (!en.alive) continue;
+
+      // Boss: stationary, fires projectiles
+      if (en.type === 'boss') {
+        en.fireTimer++;
+        if (en.fireTimer >= 50) {
+          en.fireTimer = 0;
+          var bpdx = player.x - en.x, bpdy = player.y - en.y;
+          var bpDist = Math.sqrt(bpdx * bpdx + bpdy * bpdy);
+          if (bpDist > 0.1) {
+            projectiles.push({ x: en.x, y: en.y,
+              dx: (bpdx / bpDist) * 0.06, dy: (bpdy / bpDist) * 0.06, alive: true });
+          }
+        }
+        continue;
+      }
+
       var edx = player.x - en.x, edy = player.y - en.y;
       var eDist = Math.sqrt(edx * edx + edy * edy);
 
       if (eDist < 0.5) {
         if (damageTimer % 60 === 0) {
-          playerHP -= 15;
+          var contactDmg = en.type === 'brute' ? 20 : 15;
+          playerHP -= contactDmg;
           if (dreamAudioRef && dreamAudioRef.playPlayerHurt) dreamAudioRef.playPlayerHurt();
           if (dukeVoiceRef) dukeVoiceRef.speakDamage();
           hitFlash.classList.remove('flash-bad');
@@ -5822,6 +6048,37 @@ function runDreamGame(onComplete) {
       if (map[Math.floor(eny)][Math.floor(en.x)] === 0 || map[Math.floor(eny)][Math.floor(en.x)] === 4) en.y = eny;
     }
 
+    // Update projectiles
+    for (var pi = projectiles.length - 1; pi >= 0; pi--) {
+      var proj = projectiles[pi];
+      if (!proj.alive) { projectiles.splice(pi, 1); continue; }
+      proj.x += proj.dx; proj.y += proj.dy;
+      var pcx = Math.floor(proj.x), pcy = Math.floor(proj.y);
+      if (pcy < 0 || pcy >= map.length || pcx < 0 || pcx >= map[0].length ||
+          (map[pcy][pcx] !== 0 && map[pcy][pcx] !== 4)) {
+        proj.alive = false; continue;
+      }
+      var ppd = Math.sqrt((proj.x - player.x) * (proj.x - player.x) +
+                          (proj.y - player.y) * (proj.y - player.y));
+      if (ppd < 0.5) {
+        proj.alive = false;
+        playerHP -= 20;
+        if (dreamAudioRef && dreamAudioRef.playPlayerHurt) dreamAudioRef.playPlayerHurt();
+        if (dukeVoiceRef) dukeVoiceRef.speakDamage();
+        hitFlash.classList.remove('flash-bad');
+        void hitFlash.offsetWidth;
+        hitFlash.classList.add('flash-bad');
+        setTimeout(function() { hitFlash.classList.remove('flash-bad'); }, 200);
+        if (playerHP > 0 && playerHP < 25 && dukeVoiceRef) dukeVoiceRef.speakLowHealth();
+        if (playerHP <= 0) {
+          if (dukeVoiceRef) dukeVoiceRef.speakDeath();
+          finish({ score: Math.min(100, killCount * 5), tier: 'bad',
+                   hits: killCount, misses: 0, penalties: 0, statBonus: { morale: -5, energy: -3 } });
+          return;
+        }
+      }
+    }
+
     // Intro fade (first 60 frames)
     var introAlpha = frameCount < 60 ? Math.max(0, 1 - frameCount / 60) : 0;
 
@@ -5829,7 +6086,8 @@ function runDreamGame(onComplete) {
     lastRays = castRays(player, map);
     renderFrame(ctx, lastRays, player, enemies, weapon, introAlpha, {
       hp: playerHP, kills: killCount, totalEnemies: numEnemies,
-      elapsed: elapsed, duration: DURATION, frameCount: frameCount
+      elapsed: elapsed, duration: DURATION, frameCount: frameCount,
+      projectiles: projectiles, screenShake: screenShakeTimer > 0
     });
 
     rafId = requestAnimationFrame(loop);
