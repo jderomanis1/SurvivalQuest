@@ -5025,14 +5025,14 @@ function generateDreamTextures() {
 
   // Texture 1 — Concrete: gray base, dark grit, crack lines
   var x1 = makeCtx();
-  x1.fillStyle = '#666666';
+  x1.fillStyle = '#888888';
   x1.fillRect(0, 0, TEX, TEX);
   for (var i = 0; i < 70; i++) {
-    x1.fillStyle = '#444444';
+    x1.fillStyle = '#666666';
     x1.fillRect(Math.floor(Math.random() * TEX), Math.floor(Math.random() * TEX), 1, 1);
   }
   for (var i = 0; i < 15; i++) {
-    x1.fillStyle = '#777777';
+    x1.fillStyle = '#999999';
     x1.fillRect(Math.floor(Math.random() * TEX), Math.floor(Math.random() * TEX), 1, 1);
   }
   for (var cr = 0; cr < 2 + Math.floor(Math.random() * 2); cr++) {
@@ -5060,9 +5060,9 @@ function generateDreamTextures() {
     var offset = (rowIdx % 2 === 1) ? Math.floor(bw / 2) : 0;
     for (var bx = -bw; bx < TEX + bw; bx += bw + 1) {
       var rx = bx + offset;
-      var rr = 0x8B + Math.floor(Math.random() * 20) - 10;
-      var rg = 0x45 + Math.floor(Math.random() * 16) - 8;
-      var rb = 0x13 + Math.floor(Math.random() * 10) - 5;
+      var rr = 0xA0 + Math.floor(Math.random() * 20) - 10;
+      var rg = 0x52 + Math.floor(Math.random() * 16) - 8;
+      var rb = 0x2D + Math.floor(Math.random() * 10) - 5;
       x2.fillStyle = 'rgb(' + rr + ',' + rg + ',' + rb + ')';
       x2.fillRect(Math.max(0, rx), by, Math.min(bw, TEX - Math.max(0, rx)), bh);
     }
@@ -5070,10 +5070,10 @@ function generateDreamTextures() {
 
   // Texture 3 — Metal: gunmetal base, panel seams, rivets, rust patches
   var x3 = makeCtx();
-  x3.fillStyle = '#333333';
+  x3.fillStyle = '#555555';
   x3.fillRect(0, 0, TEX, TEX);
   for (var my = 8; my < TEX; my += 8) {
-    x3.fillStyle = '#444444';
+    x3.fillStyle = '#666666';
     x3.fillRect(0, my, TEX, 1);
     x3.fillStyle = '#555555';
     for (var mx = 6; mx < TEX; mx += 12) {
@@ -5137,44 +5137,44 @@ function generateEnemySprites() {
   // ── Shambler (32×48) ──
   var sc = document.createElement('canvas'); sc.width = 32; sc.height = 48;
   var sx = sc.getContext('2d');
-  sx.fillStyle = '#5a6a5a';
+  sx.fillStyle = '#7a8a7a';
   sx.beginPath(); sx.ellipse(16, 8, 6, 7, 0, 0, Math.PI * 2); sx.fill();
   sx.fillStyle = '#00ff00';
-  sx.fillRect(12, 6, 2, 2); sx.fillRect(18, 6, 2, 2);
-  sx.fillStyle = '#5a6a5a';
+  sx.fillRect(11, 5, 3, 3); sx.fillRect(18, 5, 3, 3);
+  sx.fillStyle = '#7a8a7a';
   sx.fillRect(8, 14, 16, 18);
-  sx.fillStyle = '#4a5a4a';
+  sx.fillStyle = '#6a7a6a';
   sx.fillRect(10, 18, 4, 3); sx.fillRect(18, 20, 3, 4);
-  sx.fillStyle = '#6b4423';
+  sx.fillStyle = '#8b5a2b';
   sx.fillRect(9, 22, 5, 2); sx.fillRect(18, 25, 4, 2); sx.fillRect(11, 28, 3, 2);
-  sx.fillStyle = '#5a6a5a';
+  sx.fillStyle = '#7a8a7a';
   sx.fillRect(3, 16, 5, 10); sx.fillRect(24, 16, 5, 10);
-  sx.fillStyle = '#4a5a4a';
+  sx.fillStyle = '#6a7a6a';
   sx.fillRect(2, 26, 4, 3); sx.fillRect(26, 26, 4, 3);
   sx.fillRect(10, 32, 5, 12); sx.fillRect(17, 32, 5, 12);
-  sx.fillStyle = '#3a4a3a';
+  sx.fillStyle = '#5a6a5a';
   sx.fillRect(8, 43, 7, 5); sx.fillRect(17, 43, 7, 5);
   sprites.shambler = { normal: sc, hurt: makeHurt(sc), death: makeDeath(sc), w: 32, h: 48 };
 
   // ── Brute (40×56) ──
   var bc = document.createElement('canvas'); bc.width = 40; bc.height = 56;
   var bx = bc.getContext('2d');
-  bx.fillStyle = '#4a4a4a';
+  bx.fillStyle = '#6a6a6a';
   bx.beginPath(); bx.ellipse(20, 9, 8, 8, 0, 0, Math.PI * 2); bx.fill();
   bx.fillStyle = '#ffff00';
   bx.fillRect(14, 7, 3, 3); bx.fillRect(23, 7, 3, 3);
-  bx.fillStyle = '#4a4a4a';
+  bx.fillStyle = '#6a6a6a';
   bx.fillRect(6, 17, 28, 22);
   bx.fillStyle = '#ff4444';
   bx.fillRect(10, 20, 5, 4); bx.fillRect(25, 22, 4, 5); bx.fillRect(14, 30, 6, 3);
-  bx.fillStyle = '#3a3a3a';
+  bx.fillStyle = '#555555';
   bx.fillRect(18, 20, 4, 4); bx.fillRect(8, 28, 5, 3);
-  bx.fillStyle = '#4a4a4a';
+  bx.fillStyle = '#6a6a6a';
   bx.fillRect(1, 18, 5, 14); bx.fillRect(34, 18, 5, 14);
-  bx.fillStyle = '#3a3a3a';
+  bx.fillStyle = '#555555';
   bx.fillRect(0, 32, 6, 4); bx.fillRect(34, 32, 6, 4);
   bx.fillRect(10, 39, 7, 12); bx.fillRect(23, 39, 7, 12);
-  bx.fillStyle = '#2a2a2a';
+  bx.fillStyle = '#444444';
   bx.fillRect(8, 50, 9, 6); bx.fillRect(23, 50, 9, 6);
   sprites.brute = { normal: bc, hurt: makeHurt(bc), death: makeDeath(bc), w: 40, h: 56 };
 
@@ -5379,15 +5379,17 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
     ctx.translate((Math.random() - 0.5) * shAmt * 2, (Math.random() - 0.5) * shAmt * 1.5);
   }
 
-  // Subtle green phosphor tint
-  ctx.fillStyle = 'rgba(0,20,0,0.05)';
-  ctx.fillRect(0, 0, CW, VH);
-
-  // Sky
-  ctx.fillStyle = '#1a1a1a';
+  // Ceiling gradient (dark charcoal at top → medium gray at horizon)
+  var ceilGrad = ctx.createLinearGradient(0, 0, 0, VH / 2);
+  ceilGrad.addColorStop(0, '#1a1a2a');
+  ceilGrad.addColorStop(1, '#3a3a4a');
+  ctx.fillStyle = ceilGrad;
   ctx.fillRect(0, 0, CW, VH / 2);
-  // Floor
-  ctx.fillStyle = '#0d0d0d';
+  // Floor gradient (medium brown at horizon → dark brown at bottom)
+  var floorGrad = ctx.createLinearGradient(0, VH / 2, 0, VH);
+  floorGrad.addColorStop(0, '#3a2a1a');
+  floorGrad.addColorStop(1, '#2a1a0a');
+  ctx.fillStyle = floorGrad;
   ctx.fillRect(0, VH / 2, CW, VH / 2);
 
   // Texture-mapped wall rendering
@@ -5400,6 +5402,8 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
     var texData = dreamTextures ? dreamTextures[ray.wallType] || dreamTextures[1] : null;
     var texX = Math.floor(ray.textureX * 64) & 63;
     var sideMul = ray.side === 1 ? 0.7 : 1.0;
+    var fogMul = Math.max(0.3, 1.0 - ray.distance * 0.05);
+    sideMul *= fogMul;
 
     for (var wy = drawStart; wy < drawStart + lineH && wy < VH; wy++) {
       if (wy < 0) continue;
@@ -5491,28 +5495,57 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
     ctx.restore();
   }
 
-  // ── Weapon (positioned for 160px viewport) ──
+  // ── Weapon — double-barrel shotgun (positioned for 160px viewport) ──
   if (weapon) {
     var cx = 160;
+    // Muzzle flash (behind barrels)
     if (weapon.firing) {
       ctx.fillStyle = '#ffdd00';
-      ctx.fillRect(cx - 14, 68, 12, 20);
-      ctx.fillRect(cx +  2, 68, 12, 20);
+      ctx.fillRect(cx - 8, 72, 6, 14);
+      ctx.fillRect(cx + 2, 72, 6, 14);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(cx -  6, 63, 12, 12);
+      ctx.fillRect(cx - 5, 68, 10, 8);
     }
+    // Two parallel barrels — dark gray
     ctx.fillStyle = '#444444';
-    ctx.fillRect(cx - 8, 85, 16, 52);
+    ctx.fillRect(cx - 7, 82, 4, 32);  // left barrel
+    ctx.fillRect(cx + 3, 82, 4, 32);  // right barrel
+    // Barrel highlights
+    ctx.fillStyle = '#555555';
+    ctx.fillRect(cx - 6, 82, 1, 32);
+    ctx.fillRect(cx + 4, 82, 1, 32);
+    // Muzzle holes (black circles at top of barrels)
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(cx - 6, 82, 3, 2);
+    ctx.fillRect(cx + 3, 82, 3, 2);
+    // Pump/foregrip — dark brown
+    ctx.fillStyle = '#5a3a1a';
+    ctx.fillRect(cx - 10, 114, 20, 10);
     ctx.fillStyle = '#6b4a2a';
-    ctx.fillRect(cx - 20, 130, 40, 30);
+    ctx.fillRect(cx - 9, 115, 18, 8);
+    // Hands gripping pump — skin tone
+    ctx.fillStyle = '#d4a574';
+    ctx.fillRect(cx - 18, 112, 8, 12);  // left hand
+    ctx.fillRect(cx + 10, 112, 8, 12);  // right hand
+    ctx.fillStyle = '#c49464';
+    ctx.fillRect(cx - 17, 114, 6, 8);   // left fingers
+    ctx.fillRect(cx + 11, 114, 6, 8);   // right fingers
+    // Stock/grip — lighter brown, angled
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(cx - 8, 124, 16, 20);
+    ctx.fillStyle = '#7a5a0a';
+    ctx.fillRect(cx - 6, 128, 12, 14);
+    // Stock base (wider at very bottom)
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(cx - 12, 142, 24, 18);
     // Muzzle flash glow
     if (weapon.firing && weapon.cooldown > 12) {
       var flashAlpha = (weapon.cooldown - 12) / 3 * 0.8;
-      var mfg = ctx.createRadialGradient(cx, 75, 2, cx, 75, 22);
+      var mfg = ctx.createRadialGradient(cx, 78, 2, cx, 78, 25);
       mfg.addColorStop(0, 'rgba(255,255,170,' + flashAlpha + ')');
       mfg.addColorStop(1, 'rgba(255,255,170,0)');
       ctx.fillStyle = mfg;
-      ctx.fillRect(cx - 25, 50, 50, 50);
+      ctx.fillRect(cx - 28, 52, 56, 52);
     }
   }
 
@@ -5676,6 +5709,22 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
                                 Math.floor(Math.random()*255) + ',' +
                                 Math.floor(Math.random()*255) + ',0.5)';
       ctx.fillRect(0, by, CW, bh);
+    }
+  }
+
+  // Duke voice quote overlay (visible text fallback)
+  if (typeof dukeVoiceRef !== 'undefined' && dukeVoiceRef && dukeVoiceRef.quoteOverlay) {
+    var qo = dukeVoiceRef.quoteOverlay;
+    if (qo.timer > 0) {
+      qo.timer--;
+      var qAlpha = Math.min(1, qo.timer / 30);
+      ctx.save();
+      ctx.globalAlpha = qAlpha;
+      ctx.font = 'bold 10px VT323, monospace';
+      ctx.fillStyle = '#ffaa00';
+      ctx.textAlign = 'center';
+      ctx.fillText(qo.text, CW / 2, 20);
+      ctx.restore();
     }
   }
 
@@ -6322,7 +6371,7 @@ function applyDreamOutcome(outcome) {
 //  DUKE DREAM VOICE — POST-APOCALYPTIC ONE-LINERS
 // ════════════════════════════════════════════
 function initDukeDreamVoice() {
-  if (typeof speechSynthesis === 'undefined') return null;
+  var synth = (typeof speechSynthesis !== 'undefined') ? speechSynthesis : null;
 
   var pName = (typeof character !== 'undefined' && character.name) ? character.name : '';
   var ENTRY_QUOTES = [
@@ -6372,8 +6421,12 @@ function initDukeDreamVoice() {
   var lowHealthPlayed = false;
   var dukeVoice = null;
 
+  // Visible text fallback — shows quote on canvas regardless of speech
+  var quoteOverlay = { text: '', timer: 0 };
+
   function findDeepVoice() {
-    var voices = speechSynthesis.getVoices();
+    if (!synth) return null;
+    var voices = synth.getVoices();
     if (!voices.length) return null;
     var preferred = ['daniel', 'james', 'alex', 'male', 'english'];
     for (var p = 0; p < preferred.length; p++) {
@@ -6385,14 +6438,18 @@ function initDukeDreamVoice() {
   }
 
   function speak(line) {
-    if (typeof speechSynthesis === 'undefined') return;
-    if (speechSynthesis.speaking) return;
+    // Always show visible text fallback
+    quoteOverlay.text = line;
+    quoteOverlay.timer = 120; // ~2 seconds at 60fps
+    // Try speech synthesis
+    if (!synth) return;
+    if (synth.speaking) return;
     var utter = new SpeechSynthesisUtterance(line);
     if (!dukeVoice) dukeVoice = findDeepVoice();
     if (dukeVoice) utter.voice = dukeVoice;
     utter.pitch = 0.3;
     utter.rate = 0.9;
-    speechSynthesis.speak(utter);
+    try { synth.speak(utter); } catch(e) {}
   }
 
   function pickRandom(arr, key) {
@@ -6405,13 +6462,16 @@ function initDukeDreamVoice() {
     return pick;
   }
 
-  // Pre-load voices (some browsers populate asynchronously)
-  speechSynthesis.getVoices();
-  if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = function() { dukeVoice = findDeepVoice(); };
+  // Pre-load voices (Chrome populates asynchronously)
+  if (synth) {
+    synth.getVoices();
+    if (synth.onvoiceschanged !== undefined) {
+      synth.onvoiceschanged = function() { dukeVoice = findDeepVoice(); };
+    }
   }
 
   return {
+    quoteOverlay: quoteOverlay,
     speakEntry: function() { speak(pickRandom(ENTRY_QUOTES, 'entry')); },
     speakKill: function() { speak(pickRandom(KILL_QUOTES, 'kill')); },
     speakDamage: function() {
@@ -6429,7 +6489,7 @@ function initDukeDreamVoice() {
     speakTimeout: function() { speak(TIMEOUT_QUOTE); },
     speakDeath: function() { speak(DEATH_QUOTE); },
     stop: function() {
-      try { speechSynthesis.cancel(); } catch(e) {}
+      if (synth) { try { synth.cancel(); } catch(e) {} }
     }
   };
 }
