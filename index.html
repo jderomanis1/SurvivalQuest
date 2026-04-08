@@ -2713,6 +2713,7 @@ var dreamSequenceActive = false;
 var dreamSequenceUsed = { morale: false, artifact: false, day7: false };
 var dreamAudioRef = null;
 var dukeVoiceRef = null;
+var dreamTextures = null;
 var gameState = {
   morale:    75,
   hunger:    80,
@@ -4998,6 +4999,103 @@ function launchDreamSequence(triggerType) {
 //  DREAM SEQUENCE — RAYCASTING FPS ENGINE
 // ════════════════════════════════════════════
 
+function generateDreamTextures() {
+  var TEX = 64;
+  var textures = {};
+
+  function makeCtx() {
+    var c = document.createElement('canvas');
+    c.width = TEX; c.height = TEX;
+    return c.getContext('2d');
+  }
+
+  // Texture 1 — Concrete: gray base, dark grit, crack lines
+  var x1 = makeCtx();
+  x1.fillStyle = '#666666';
+  x1.fillRect(0, 0, TEX, TEX);
+  for (var i = 0; i < 70; i++) {
+    x1.fillStyle = '#444444';
+    x1.fillRect(Math.floor(Math.random() * TEX), Math.floor(Math.random() * TEX), 1, 1);
+  }
+  for (var i = 0; i < 15; i++) {
+    x1.fillStyle = '#777777';
+    x1.fillRect(Math.floor(Math.random() * TEX), Math.floor(Math.random() * TEX), 1, 1);
+  }
+  for (var cr = 0; cr < 2 + Math.floor(Math.random() * 2); cr++) {
+    x1.beginPath();
+    x1.strokeStyle = '#333333';
+    x1.lineWidth = 1;
+    var sx = Math.floor(Math.random() * TEX);
+    var sy = Math.floor(Math.random() * TEX);
+    x1.moveTo(sx, sy);
+    x1.bezierCurveTo(
+      sx + (Math.random() - 0.5) * 30, sy + (Math.random() - 0.5) * 30,
+      sx + (Math.random() - 0.5) * 40, sy + (Math.random() - 0.5) * 40,
+      sx + (Math.random() - 0.5) * 50, sy + (Math.random() - 0.5) * 50
+    );
+    x1.stroke();
+  }
+
+  // Texture 2 — Brick: mortar base, offset brick grid with color variation
+  var x2 = makeCtx();
+  x2.fillStyle = '#3a2a1a';
+  x2.fillRect(0, 0, TEX, TEX);
+  var bw = 12, bh = 6;
+  for (var by = 0; by < TEX; by += bh + 1) {
+    var rowIdx = Math.floor(by / (bh + 1));
+    var offset = (rowIdx % 2 === 1) ? Math.floor(bw / 2) : 0;
+    for (var bx = -bw; bx < TEX + bw; bx += bw + 1) {
+      var rx = bx + offset;
+      var rr = 0x8B + Math.floor(Math.random() * 20) - 10;
+      var rg = 0x45 + Math.floor(Math.random() * 16) - 8;
+      var rb = 0x13 + Math.floor(Math.random() * 10) - 5;
+      x2.fillStyle = 'rgb(' + rr + ',' + rg + ',' + rb + ')';
+      x2.fillRect(Math.max(0, rx), by, Math.min(bw, TEX - Math.max(0, rx)), bh);
+    }
+  }
+
+  // Texture 3 — Metal: gunmetal base, panel seams, rivets, rust patches
+  var x3 = makeCtx();
+  x3.fillStyle = '#333333';
+  x3.fillRect(0, 0, TEX, TEX);
+  for (var my = 8; my < TEX; my += 8) {
+    x3.fillStyle = '#444444';
+    x3.fillRect(0, my, TEX, 1);
+    x3.fillStyle = '#555555';
+    for (var mx = 6; mx < TEX; mx += 12) {
+      x3.beginPath();
+      x3.arc(mx, my, 1.5, 0, Math.PI * 2);
+      x3.fill();
+    }
+  }
+  for (var rp = 0; rp < 3 + Math.floor(Math.random() * 2); rp++) {
+    var rpx = Math.floor(Math.random() * (TEX - 5));
+    var rpy = Math.floor(Math.random() * (TEX - 5));
+    x3.fillStyle = '#8B4500';
+    for (var ri = 0; ri < 8; ri++) {
+      x3.fillRect(rpx + Math.floor(Math.random() * 5), rpy + Math.floor(Math.random() * 5), 1, 1);
+    }
+  }
+
+  // Texture 4 — Hazard Door: diagonal yellow/black stripes
+  var x4 = makeCtx();
+  for (var hy = 0; hy < TEX; hy++) {
+    for (var hx = 0; hx < TEX; hx++) {
+      var stripe = Math.floor((hx + hy) / 8) % 2;
+      x4.fillStyle = stripe ? '#FFD700' : '#111111';
+      x4.fillRect(hx, hy, 1, 1);
+    }
+  }
+
+  // Extract raw pixel data for fast sampling during rendering
+  textures[1] = x1.getImageData(0, 0, TEX, TEX).data;
+  textures[2] = x2.getImageData(0, 0, TEX, TEX).data;
+  textures[3] = x3.getImageData(0, 0, TEX, TEX).data;
+  textures[4] = x4.getImageData(0, 0, TEX, TEX).data;
+
+  return textures;
+}
+
 function generateDreamMap() {
   var W = 10, H = 10;
   // Start all walls (type 1)
@@ -5031,13 +5129,19 @@ function generateDreamMap() {
   }
   carve(1, 1);
 
-  // Replace ~20% of walls that touch a corridor with type 2 (rust)
+  // Assign varied wall types to interior walls touching corridors
   for (var r = 1; r < H-1; r++) {
     for (var c = 1; c < W-1; c++) {
-      if (map[r][c] === 1 && Math.random() < 0.2) {
+      if (map[r][c] === 1) {
         var adj = [[0,1],[0,-1],[1,0],[-1,0]];
+        var touchesCorridor = false;
         for (var a = 0; a < adj.length; a++) {
-          if (map[r+adj[a][0]][c+adj[a][1]] === 0) { map[r][c] = 2; break; }
+          if (map[r+adj[a][0]][c+adj[a][1]] === 0) { touchesCorridor = true; break; }
+        }
+        if (touchesCorridor) {
+          var rnd = Math.random();
+          if (rnd < 0.25) map[r][c] = 2;       // brick
+          else if (rnd < 0.35) map[r][c] = 3;   // metal
         }
       }
     }
@@ -5061,7 +5165,16 @@ function generateDreamMap() {
       }
     }
   }
-  map[farthest.y][farthest.x] = 3; // exit door
+  map[farthest.y][farthest.x] = 4; // hazard exit door
+  // Metal walls around exit area
+  var exitAdj = [[0,1],[0,-1],[1,0],[-1,0]];
+  for (var ea = 0; ea < exitAdj.length; ea++) {
+    var ear = farthest.y + exitAdj[ea][0];
+    var eac = farthest.x + exitAdj[ea][1];
+    if (ear >= 1 && ear < H-1 && eac >= 1 && eac < W-1 && map[ear][eac] >= 1 && map[ear][eac] <= 2) {
+      map[ear][eac] = 3;
+    }
+  }
 
   return map;
 }
@@ -5148,23 +5261,32 @@ function renderFrame(ctx, rays, player, enemies, weapon, introAlpha, hudData) {
   ctx.fillStyle = '#0d0d0d';
   ctx.fillRect(0, VH / 2, CW, VH / 2);
 
-  var wallColors = { 1: [74, 74, 74], 2: [107, 58, 42], 3: [42, 107, 42] };
+  // Texture-mapped wall rendering
+  var fallbackColors = { 1: [102, 102, 102], 2: [139, 69, 19], 3: [51, 51, 51], 4: [255, 215, 0] };
 
   for (var col = 0; col < CW; col++) {
     var ray = rays[col];
     var lineH = Math.min(VH, Math.floor(VH / ray.distance));
     var drawStart = Math.floor((VH - lineH) / 2);
-
-    var base = wallColors[ray.wallType] || wallColors[1];
-    var r = base[0], g = base[1], b = base[2];
-    if (ray.side === 1) { r = Math.floor(r * 0.7); g = Math.floor(g * 0.7); b = Math.floor(b * 0.7); }
+    var texData = dreamTextures ? dreamTextures[ray.wallType] || dreamTextures[1] : null;
+    var texX = Math.floor(ray.textureX * 64) & 63;
+    var sideMul = ray.side === 1 ? 0.7 : 1.0;
 
     for (var wy = drawStart; wy < drawStart + lineH && wy < VH; wy++) {
       if (wy < 0) continue;
-      var stripe = (wy % 2 === 0) ? 10 : -10;
-      var tr = Math.min(255, Math.max(0, r + stripe));
-      var tg = Math.min(255, Math.max(0, g + stripe));
-      var tb = Math.min(255, Math.max(0, b + stripe));
+      var tr, tg, tb;
+      if (texData) {
+        var texY = Math.floor(((wy - drawStart) / lineH) * 64) & 63;
+        var idx = (texY * 64 + texX) * 4;
+        tr = Math.floor(texData[idx] * sideMul);
+        tg = Math.floor(texData[idx + 1] * sideMul);
+        tb = Math.floor(texData[idx + 2] * sideMul);
+      } else {
+        var fb = fallbackColors[ray.wallType] || fallbackColors[1];
+        tr = Math.floor(fb[0] * sideMul);
+        tg = Math.floor(fb[1] * sideMul);
+        tb = Math.floor(fb[2] * sideMul);
+      }
       ctx.fillStyle = 'rgb(' + tr + ',' + tg + ',' + tb + ')';
       ctx.fillRect(col, wy, 1, 1);
     }
@@ -5398,6 +5520,7 @@ function runDreamGame(onComplete) {
   canvas.width = 320; canvas.height = 200;
 
   var map = generateDreamMap();
+  if (!dreamTextures) dreamTextures = generateDreamTextures();
   var player = { x: 1.5, y: 1.5, angle: 0, moveSpeed: 0.06, rotSpeed: 0.04 };
 
   // Spawn 5-7 enemies in empty cells at least 3 cells from (1,1)
@@ -5635,12 +5758,12 @@ function runDreamGame(onComplete) {
     // Wall collision
     var nx = player.x + moveX, ny = player.y + moveY;
     var MARGIN = 0.25;
-    if (map[Math.floor(player.y)][Math.floor(nx)] === 0 || map[Math.floor(player.y)][Math.floor(nx)] === 3) {
+    if (map[Math.floor(player.y)][Math.floor(nx)] === 0 || map[Math.floor(player.y)][Math.floor(nx)] === 4) {
       player.x = nx;
     } else if (moveX !== 0) {
       player.x = moveX > 0 ? Math.floor(nx) - MARGIN : Math.ceil(nx) + MARGIN;
     }
-    if (map[Math.floor(ny)][Math.floor(player.x)] === 0 || map[Math.floor(ny)][Math.floor(player.x)] === 3) {
+    if (map[Math.floor(ny)][Math.floor(player.x)] === 0 || map[Math.floor(ny)][Math.floor(player.x)] === 4) {
       player.y = ny;
     } else if (moveY !== 0) {
       player.y = moveY > 0 ? Math.floor(ny) - MARGIN : Math.ceil(ny) + MARGIN;
@@ -5654,7 +5777,7 @@ function runDreamGame(onComplete) {
 
     // Check exit
     var cellX = Math.floor(player.x), cellY = Math.floor(player.y);
-    if (map[cellY] && map[cellY][cellX] === 3) {
+    if (map[cellY] && map[cellY][cellX] === 4) {
       if (dreamAudioRef && dreamAudioRef.playExitFound) dreamAudioRef.playExitFound();
       if (dukeVoiceRef) dukeVoiceRef.speakVictory();
       var eScore = Math.min(100, 60 + killCount * 5);
@@ -5695,8 +5818,8 @@ function runDreamGame(onComplete) {
       var eAngle = Math.atan2(edy, edx);
       var enx = en.x + Math.cos(eAngle) * en.speed;
       var eny = en.y + Math.sin(eAngle) * en.speed;
-      if (map[Math.floor(en.y)][Math.floor(enx)] === 0 || map[Math.floor(en.y)][Math.floor(enx)] === 3) en.x = enx;
-      if (map[Math.floor(eny)][Math.floor(en.x)] === 0 || map[Math.floor(eny)][Math.floor(en.x)] === 3) en.y = eny;
+      if (map[Math.floor(en.y)][Math.floor(enx)] === 0 || map[Math.floor(en.y)][Math.floor(enx)] === 4) en.x = enx;
+      if (map[Math.floor(eny)][Math.floor(en.x)] === 0 || map[Math.floor(eny)][Math.floor(en.x)] === 4) en.y = eny;
     }
 
     // Intro fade (first 60 frames)
