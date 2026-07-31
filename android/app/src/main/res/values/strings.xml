@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dark Commute</string>
+    <string name="game_content_description">Dark Commute survival game</string>
+    <string name="initializing">INITIALIZING DARK COMMUTE…</string>
+    <string name="render_error_title">SIGNAL LOST</string>
+    <string name="render_error_message">The game renderer stopped unexpectedly. Your local save is still available.</string>
+    <string name="reload">RELOAD TERMINAL</string>
+</resources>

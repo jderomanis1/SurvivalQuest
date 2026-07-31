@@ -1,0 +1,66 @@
+name: Android
+
+on:
+  pull_request:
+    paths:
+      - "android/**"
+      - "index.html"
+      - "styles.css"
+      - "src/**"
+      - "netlify/functions/verify-purchase.js"
+      - ".github/workflows/android.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "index.html"
+      - "styles.css"
+      - "src/**"
+      - "netlify/functions/verify-purchase.js"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android 16 SDK
+        run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.1.0"
+      - name: Build, test and lint
+        id: android-build
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle -p android :app:testDebugUnitTest :app:lintDebug :app:bundleDebug --stacktrace 2>&1 | tee android-build.log
+      - name: Upload Android diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-diagnostics
+          path: |
+            android-build.log
+            android/app/build/reports/lint-results-debug.html
+            android/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            android/app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload debug app bundle
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dark-commute-debug-aab
+          path: android/app/build/outputs/bundle/debug/app-debug.aab
+          if-no-files-found: error
+          retention-days: 14
