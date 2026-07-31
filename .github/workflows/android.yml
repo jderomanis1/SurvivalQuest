@@ -44,13 +44,17 @@ jobs:
         run: |
           set -o pipefail
           gradle -p android :app:testDebugUnitTest :app:lintDebug :app:bundleDebug --stacktrace 2>&1 | tee android-build.log
-      - name: Upload Android build log
+      - name: Upload Android diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-build-log
-          path: android-build.log
-          if-no-files-found: error
+          name: android-diagnostics
+          path: |
+            android-build.log
+            android/app/build/reports/lint-results-debug.html
+            android/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            android/app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
           retention-days: 14
       - name: Upload debug app bundle
         if: success()
