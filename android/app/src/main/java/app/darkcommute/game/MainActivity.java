@@ -65,7 +65,7 @@ public final class MainActivity extends AppCompatActivity implements BillingMana
         configureWebView();
         configureBackNavigation();
 
-        if (savedInstanceState == null || !webView.restoreState(savedInstanceState)) {
+        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
             webView.loadUrl(START_URL);
         } else {
             loadingPanel.setVisibility(View.GONE);
