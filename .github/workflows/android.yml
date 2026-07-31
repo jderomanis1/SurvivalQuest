@@ -39,8 +39,22 @@ jobs:
         with:
           gradle-version: "9.1.0"
       - name: Build, test and lint
-        run: gradle -p android :app:testDebugUnitTest :app:lintDebug :app:bundleDebug --stacktrace
-      - uses: actions/upload-artifact@v4
+        id: android-build
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle -p android :app:testDebugUnitTest :app:lintDebug :app:bundleDebug --stacktrace 2>&1 | tee android-build.log
+      - name: Upload Android build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-log
+          path: android-build.log
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload debug app bundle
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: dark-commute-debug-aab
           path: android/app/build/outputs/bundle/debug/app-debug.aab
